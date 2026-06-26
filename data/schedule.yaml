@@ -20,6 +20,13 @@ classes:
     level: 待確認
     note: 用戶 2026-06-26 提供：「名字之後再確認」
 
+  - id: STU-02
+    name: 長頸鹿（復興）
+    weekly_count: 1
+    level: 待確認
+    note: 地點：復興
+
+
 # 排定的課（從 7/3 開始，共 8 週 = 16 堂）
 schedules:
   - class_id: STU-01
@@ -35,3 +42,10 @@ schedules:
     start_date: 2026-07-03
     duration_weeks: 8
     note: 每週五 9:00-10:00
+
+  - class_id: STU-02
+    day: tue
+    slot_id: S3
+    start_date: 2026-07-08
+    duration_weeks: 6
+    note: 長頸鹿（復興）每週二 9:00-10:00，共 6 堂（⚠️ 7/8 是週三，系統從 7/14 開始排）
