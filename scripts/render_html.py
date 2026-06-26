@@ -158,9 +158,9 @@ def render_month(data, year, month):
     html.append(f'<a href="{next_year}-{next_month:02d}.html">下一月 →</a>')
     html.append('</div>')
     html.append('</header>')
-            '<main>',
-            '<table class="calendar">',
-            '<thead><tr>',
+    html = ['<main>',
+             '<table class="calendar">',
+             '<thead><tr>',
     ]
     for d in DAY_NAMES_ZH.values():
         html.append(f'<th>{d}</th>')
