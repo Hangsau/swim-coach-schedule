@@ -68,7 +68,11 @@ def expand_schedule(schedules, slots_by_id, classes_by_id):
         else:
             # 重複模式（每週）
             start = _to_date(s["start_date"])
-            end = start + timedelta(weeks=s["duration_weeks"])
+            # end_date 優先，否則用 duration_weeks 算
+            if "end_date" in s:
+                end = _to_date(s["end_date"]) + timedelta(days=1)  # 含當天
+            else:
+                end = start + timedelta(weeks=s["duration_weeks"])
             target_day = DAY_NAMES.index(s["day"])
             days_ahead = (target_day - start.weekday()) % 7
             first_date = start + timedelta(days=days_ahead)

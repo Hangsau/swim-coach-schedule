@@ -61,7 +61,10 @@ def expand_schedule(schedules, slots_by_id, classes_by_id):
                 })
         else:
             start = _to_date(s["start_date"])
-            end = start + timedelta(weeks=s["duration_weeks"])
+            if "end_date" in s:
+                end = _to_date(s["end_date"]) + timedelta(days=1)
+            else:
+                end = start + timedelta(weeks=s["duration_weeks"])
             target_day = DAY_NAMES.index(s["day"])
             days_ahead = (target_day - start.weekday()) % 7
             first_date = start + timedelta(days=days_ahead)
