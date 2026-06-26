@@ -40,78 +40,12 @@ def load():
 
 
 def expand_schedule(schedules, slots_by_id, classes_by_id):
-    expanded = []
-    for s in schedules:
-        slot = slots_by_id.get(s["slot_id"], {})
-        cls = classes_by_id.get(s["class_id"], {})
-
-        if "specific_dates" in s:
-            for ds in s["specific_dates"]:
-                current = _to_date(ds)
-                expanded.append({
-                    "date": current,
-                    "day": DAY_NAMES[current.weekday()],
-                    "slot_id": s["slot_id"],
-                    "slot_time": slot.get("time", "?"),
-                    "slot_note": slot.get("note", ""),
-                    "class_id": s["class_id"],
-                    "class_name": cls.get("name", "?"),
-                    "level": cls.get("level", ""),
-                    "note": s.get("note", ""),
-                })
-        else:
-            if "day" in s:
-                start = _to_date(s["start_date"])
-                if "end_date" in s:
-                    end = _to_date(s["end_date"]) + timedelta(days=1)
-                else:
-                    end = start + timedelta(weeks=s["duration_weeks"])
-                target_day = DAY_NAMES.index(s["day"])
-                days_ahead = (target_day - start.weekday()) % 7
-                first_date = start + timedelta(days=days_ahead)
-                current = first_date
-                while current < end:
-                    expanded.append({
-                        "date": current,
-                        "day": s["day"],
-                        "slot_id": s["slot_id"],
-                        "slot_time": slot.get("time", "?"),
-                        "slot_note": slot.get("note", ""),
-                        "class_id": s["class_id"],
-                        "class_name": cls.get("name", "?"),
-                        "level": cls.get("level", ""),
-                        "note": s.get("note", ""),
-                    })
-                    current += timedelta(days=7)
-            elif "days" in s:
-                # 支援 days + total_lessons（跑到 N 堂停）
-                # 支援 days + end_date（跑到 end_date 停）
-                start = _to_date(s["start_date"])
-                target_day_set = set(DAY_NAMES.index(d) for d in s["days"])
-                if "end_date" in s:
-                    end = _to_date(s["end_date"]) + timedelta(days=1)
-                else:
-                    end = start + timedelta(weeks=12)
-                max_lessons = s.get("total_lessons", 99999)
-                current = start
-                count = 0
-                while current < end and count < max_lessons:
-                    if current.weekday() in target_day_set:
-                        actual_day = DAY_NAMES[current.weekday()]
-                        expanded.append({
-                            "date": current,
-                            "day": actual_day,
-                            "slot_id": s["slot_id"],
-                            "slot_time": slot.get("time", "?"),
-                            "slot_note": slot.get("note", ""),
-                            "class_id": s["class_id"],
-                            "class_name": cls.get("name", "?"),
-                            "level": cls.get("level", ""),
-                            "note": s.get("note", ""),
-                        })
-                        count += 1
-                    current += timedelta(days=1)
-    return expanded
+    """直接用 query.py 的 expand_schedule（單一來源，避免 drift）"""
+    import sys
+    if "scripts" not in sys.path:
+        sys.path.insert(0, str(Path(__file__).parent))
+    from query import expand_schedule as _expand
+    return _expand(schedules, slots_by_id, classes_by_id)
 
 
 def render_month(data, year, month):
