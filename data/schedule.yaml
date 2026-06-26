@@ -11,6 +11,12 @@ slots:
   - id: S3
     time: "09:00-10:00"
     note: 早上 9 點
+  - id: S4
+    time: "10:10-11:10"
+    note: 早上 10 點
+  - id: S5
+    time: "13:00-14:00"
+    note: 下午 1 點
 
 # 班級 / 學員
 classes:
@@ -26,9 +32,20 @@ classes:
     level: 待確認
     note: 地點：復興
 
+  - id: STU-03
+    name: 長頸鹿（塗城）
+    weekly_count: 2
+    level: 待確認
+    note: 地點：塗城
 
-# 排定的課（從 7/3 開始，共 8 週 = 16 堂）
+  - id: STU-04
+    name: 乖乖
+    weekly_count: 3
+    level: 待確認
+
+# 排定的課
 schedules:
+  # 學員-待確認：每週三、五，從 7/3 起 8 週 = 16 堂
   - class_id: STU-01
     day: wed
     slot_id: S3
@@ -43,6 +60,7 @@ schedules:
     duration_weeks: 8
     note: 每週五 9:00-10:00
 
+  # 長頸鹿（復興）：指定 6 個日期
   - class_id: STU-02
     slot_id: S3
     specific_dates:
@@ -53,3 +71,40 @@ schedules:
       - 2026-08-18
       - 2026-08-25
     note: 長頸鹿（復興）指定 6 個日期 9:00-10:00
+
+  # 長頸鹿（塗城）：每週一、四，從 7/2 起 12 週 = 24 堂
+  - class_id: STU-03
+    day: mon
+    slot_id: S4
+    start_date: 2026-07-02
+    duration_weeks: 12
+    note: 每週一 10:10-11:10
+
+  - class_id: STU-03
+    day: thu
+    slot_id: S4
+    start_date: 2026-07-02
+    duration_weeks: 12
+    note: 每週四 10:10-11:10
+
+  # 乖乖：每週一、二、三，從 7/1 起 7 週
+  - class_id: STU-04
+    day: mon
+    slot_id: S5
+    start_date: 2026-07-01
+    duration_weeks: 7
+    note: 每週一 13:00-14:00
+
+  - class_id: STU-04
+    day: tue
+    slot_id: S5
+    start_date: 2026-07-01
+    duration_weeks: 7
+    note: 每週二 13:00-14:00
+
+  - class_id: STU-04
+    day: wed
+    slot_id: S5
+    start_date: 2026-07-01
+    duration_weeks: 7
+    note: 每週三 13:00-14:00
