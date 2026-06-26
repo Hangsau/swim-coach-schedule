@@ -5,7 +5,12 @@
 
 ## 🌐 線上版
 
-**https://hangsau.github.io/swim-coach-schedule/**（月曆 view）
+主網址：<https://hangsau.github.io/swim-coach-schedule/>
+
+常用頁面：
+- 月曆 view：<https://hangsau.github.io/swim-coach-schedule/2026-07.html>
+- 每日 grid：<https://hangsau.github.io/swim-coach-schedule/grid-2026-07.html>
+- 學員總表：<https://hangsau.github.io/swim-coach-schedule/summary.html>
 
 > GitHub Pages 自動 build + deploy。每次 push main 後 30 秒內更新。
 
