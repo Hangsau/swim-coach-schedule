@@ -80,7 +80,8 @@ def test_no_slot_double_booking():
     conflicts = [(k, lst) for k, lst in by_date_slot.items() if len(lst) > 1]
     if conflicts:
         for (d, sid), lst in conflicts:
-            print(f"  ✗ {d} {sid}: {len(lst)} 堂 → {[f\"{l['class_id']}({l['class_name']})\" for l in lst]}")
+            names = [f"{l['class_id']}({l['class_name']})" for l in lst]
+            print(f"  ✗ {d} {sid}: {len(lst)} 堂 → {names}")
         assert False, f"發現 {len(conflicts)} 個同日同時段跨班衝突（你只有一個人，泳池同時間只能一班）"
     print(f"✓ 沒有同日同時段跨班衝突")
 
