@@ -67,6 +67,11 @@ classes:
   weekly_count: 1
   level: 待確認
   note: 每週四代課
+- id: STU-10
+  name: 個別班
+  weekly_count: 5
+  level: 待確認
+  note: 一對一 / 小班
 schedules:
 - class_id: STU-01
   day: wed
