@@ -229,7 +229,6 @@ if __name__ == "__main__":
     test_no_reserved_slot_conflict()
     test_time_overlap_basic()
     test_no_dead_slots()
-    test_no_schedule_for_classes_only_in_reserved()
     test_all_references_valid()
     print("\n--- HTML 內容檢查 ---")
     test_html_contains_all_class_names()
