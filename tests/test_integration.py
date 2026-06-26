@@ -154,6 +154,24 @@ def test_time_overlap_basic():
     print("✓ 時間重疊基礎函式正確")
 
 
+def test_no_dead_slots():
+    """沒有 schedule 引用的 slot 應該被清掉（避免月曆時段表頭有死格）"""
+    data = load()
+    slots_by_id = {s['id']: s for s in data.get('slots', [])}
+    classes_by_id = {c['id']: c for c in data.get('classes', [])}
+    all_lessons = expand_schedule(data.get('schedules', []), slots_by_id, classes_by_id)
+
+    used_slots = set(l['slot_id'] for l in all_lessons)
+    dead = [s['id'] for s in data.get('slots', []) if s['id'] not in used_slots]
+
+    if dead:
+        for sid in dead:
+            slot = slots_by_id[sid]
+            print(f"  ✗ {sid} {slot['time']} 沒任何 schedule 用（建議刪除或加 schedule）")
+        assert False, f"{len(dead)} 個 dead slot（沒 schedule 用）"
+    print(f"✓ 所有 slot 都有 schedule 用")
+
+
 def test_all_references_valid():
     """所有 schedule 引用都有效（slot_id 和 class_id 都存在）"""
     data = load()
