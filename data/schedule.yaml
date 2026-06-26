@@ -65,6 +65,11 @@ classes:
   weekly_count: 1
   level: 待確認
   note: 時段其實是 S11（不是 S9）
+- id: STU-10
+  name: 代課（20:10-21:10）
+  weekly_count: 1
+  level: 待確認
+  note: 「S10 20:10-21:10 7/6 開始 每週四 代課」user 2026-06-26
 schedules:
 - class_id: STU-01
   day: wed
