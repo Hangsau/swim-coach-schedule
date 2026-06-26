@@ -91,12 +91,21 @@ def expand_schedule(schedules, slots_by_id, classes_by_id):
                     })
                     current += timedelta(days=7)
             # 模式 B：多日 + 跑到 N 堂（days + total_lessons）
-            elif "days" in s and "total_lessons" in s:
+            elif "days" in s:
+                # 模式 C：多日 + 跑到 N 堂（days + total_lessons）
+                # 模式 D：多日 + 跑到 end_date
                 start = _to_date(s["start_date"])
                 target_day_set = set(DAY_NAMES.index(d) for d in s["days"])
+                if "end_date" in s:
+                    end = _to_date(s["end_date"]) + timedelta(days=1)
+                    use_end = True
+                else:
+                    end = start + timedelta(weeks=7)
+                    use_end = False
+                max_lessons = s.get("total_lessons", 99999)  # 預設無限
                 current = start
                 count = 0
-                while count < s["total_lessons"]:
+                while current < end and count < max_lessons:
                     if current.weekday() in target_day_set:
                         actual_day = DAY_NAMES[current.weekday()]
                         expanded.append({

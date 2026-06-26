@@ -595,9 +595,13 @@ def render_grid(data, year, month):
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
     all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
 
-    # 篩選該月 + 排序時段
+    # 篩選該月
     month_lessons = [l for l in all_lessons if l["date"].year == year and l["date"].month == month]
-    slot_ids = sorted(slots_by_id.keys())
+    # 時段按時間排序（解析 HH:MM-HH:MM）
+    def slot_sort_key(sid):
+        t = slots_by_id[sid].get("time", "99:99-99:99")
+        return t.split("-")[0].strip()
+    slot_ids = sorted(slots_by_id.keys(), key=slot_sort_key)
     slot_meta = [(sid, slots_by_id[sid].get("time", "?")) for sid in slot_ids]
 
     # 找這個月所有有課的日期
