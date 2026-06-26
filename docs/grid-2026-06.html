@@ -266,6 +266,26 @@ table.grid tbody tr:hover {
 table.grid tbody tr:hover td.empty {
   background: #e8e8e8;
 }
+table.grid tfoot tr.totals {
+  background: var(--accent);
+  color: white;
+  font-weight: bold;
+}
+table.grid tfoot td {
+  border-top: 2px solid var(--accent);
+  padding: 8px 4px;
+}
+table.grid tfoot td.date-col {
+  background: var(--accent);
+  color: white;
+}
+table.grid tfoot td.total-cell {
+  font-size: 14px;
+}
+table.grid tfoot td.date-col .wd {
+  color: rgba(255,255,255,0.85);
+  font-size: 11px;
+}
 .hint {
   font-size: 13px;
   color: #888;
@@ -650,15 +670,21 @@ table.grid tbody tr:hover td.empty {
 <td class="empty"></td>
 <td class="empty"></td>
 </tr>
-</tbody></table></div>
-<aside class="month-stats">
-<h2>📊 2026 年 6 月統計</h2>
-<div class="stat-total">總堂數：<strong>0</strong> 堂</div>
-<table class="calendar"><thead><tr><th>時段</th><th>堂數</th></tr></thead><tbody>
-</tbody></table>
-<table class="calendar"><thead><tr><th>學員</th><th>堂數</th></tr></thead><tbody>
-</tbody></table>
-</aside>
+</tbody>
+<tfoot>
+<tr class="totals">
+<td class="date-col">合計<br><span class="wd">0 堂</span></td>
+<td class="total-cell"></td>
+<td class="total-cell"></td>
+<td class="total-cell"></td>
+<td class="total-cell"></td>
+<td class="total-cell"></td>
+<td class="total-cell"></td>
+<td class="total-cell"></td>
+<td class="total-cell"></td>
+</tr>
+</tfoot>
+</table></div>
 </main>
 <footer><p>更新時間：2026-06-26</p></footer>
 </body></html>

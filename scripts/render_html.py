@@ -657,34 +657,25 @@ def render_grid(data, year, month):
                 html.append('<td class="empty"></td>')
         html.append('</tr>')
 
-    html.append('</tbody></table></div>')
+    html.append('</tbody>')
 
-    # 月統計（同 render_month 的 aside.month-stats）
+    # tfoot 合計行：每個時段欄底加總堂數
     from collections import Counter
     slot_count = Counter()
-    class_count = Counter()
     for l in month_lessons:
         slot_count[l["slot_id"]] += 1
-        class_count[l["class_name"]] += 1
     total = sum(slot_count.values())
 
-    html.append('<aside class="month-stats">')
-    html.append(f'<h2>📊 {year} 年 {month} 月統計</h2>')
-    html.append(f'<div class="stat-total">總堂數：<strong>{total}</strong> 堂</div>')
-    html.append('<table class="calendar"><thead><tr><th>時段</th><th>堂數</th></tr></thead><tbody>')
-    def _gs_key(sid):
-        t = slots_by_id.get(sid, {}).get("time", "99:99-99:99")
-        return t.split("-")[0].strip()
-    for sid in sorted(slot_count.keys(), key=_gs_key):
-        slot = slots_by_id.get(sid, {})
-        html.append(f'<tr><td>{slot.get("time","?")} {slot.get("note","")}（{sid}）</td><td>{slot_count[sid]}</td></tr>')
-    html.append('</tbody></table>')
-    html.append('<table class="calendar"><thead><tr><th>學員</th><th>堂數</th></tr></thead><tbody>')
-    for cname in sorted(class_count.keys()):
-        html.append(f'<tr><td>{cname}</td><td>{class_count[cname]}</td></tr>')
-    html.append('</tbody></table>')
-    html.append('</aside>')
+    html.append('<tfoot>')
+    html.append('<tr class="totals">')
+    html.append(f'<td class="date-col">合計<br><span class="wd">{total} 堂</span></td>')
+    for sid, _ in slot_meta:
+        cnt = slot_count.get(sid, 0)
+        html.append(f'<td class="total-cell">{cnt if cnt else ""}</td>')
+    html.append('</tr>')
+    html.append('</tfoot>')
 
+    html.append('</table></div>')
     html.append('</main>')
     html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d")}</p></footer>')
     html.append('</body></html>')
@@ -748,6 +739,26 @@ table.grid tbody tr:hover {
 }
 table.grid tbody tr:hover td.empty {
   background: #e8e8e8;
+}
+table.grid tfoot tr.totals {
+  background: var(--accent);
+  color: white;
+  font-weight: bold;
+}
+table.grid tfoot td {
+  border-top: 2px solid var(--accent);
+  padding: 8px 4px;
+}
+table.grid tfoot td.date-col {
+  background: var(--accent);
+  color: white;
+}
+table.grid tfoot td.total-cell {
+  font-size: 14px;
+}
+table.grid tfoot td.date-col .wd {
+  color: rgba(255,255,255,0.85);
+  font-size: 11px;
 }
 .hint {
   font-size: 13px;
