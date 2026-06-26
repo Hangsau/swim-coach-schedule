@@ -137,15 +137,17 @@ python scripts/schedule_cli.py --json add-schedule --class STU-04 --slot S5 --da
 | `add-class --id --name --weekly-count [--level] [--note]` | 新增班 | 是 |
 | `update-class --id [--name] [--weekly-count] [--level] [--note]` | 改班欄位 | 是 |
 | `remove-class --id [--cascade]` | 刪班（cascade 連帶刪 schedule） | 是 |
-| `add-schedule --class --slot --start --(day\|days\|specific-dates) [--weeks\|--end\|--lessons]` | 新增 schedule | 是 |
+| `add-schedule --class (--slot\|--time) --start --(day\|days\|specific-dates) [--weeks\|--end\|--lessons] [--note]` | 新增 schedule | 是 |
 | `remove-schedule --class [--slot-id] [--day] [--all]` | 刪 schedule | 是 |
+| `move-lesson --class --from-date --to-date [--to-slot\|--to-time] [--note]` | 挪一堂課（補課） | 是 |
+| `split-schedule (--class\|--schedule-id) --at --(day\|days) [--to-slot\|--to-time] (--weeks\|--end\|--lessons) [--note]` | 把某 schedule 在某日切兩半，過去不動、未來改 | 是 |
 
 ### 錯誤碼處理表
 
 | code | 意思 | 你該做 |
 |------|------|--------|
 | `E_CLASS_NOT_FOUND` | class id 不存在 | 拼字確認；不存在就先 `add-class` |
-| `E_SLOT_NOT_FOUND` | slot id 不存在 | `list-slots` 查可用 id（目前固定 S3..S10） |
+| `E_SLOT_NOT_FOUND` | slot id 不存在 | `list-slots` 查可用 id；或改用 `--time HH:MM-HH:MM` 直接寫 |
 | `E_DUPLICATE_ID` | 該 id 已存在 | 改用 `update-class` 或換一個 id |
 | `E_DUPLICATE_SCHEDULE` | 完全相同的 schedule 重複 | 不需重加；改用 `update-schedule`（未來實作）或先 remove |
 | `E_TIME_OVERLAP` | 兩堂課時段重疊（教練只有一人） | 看 `context.lesson_a/b`；改時段或挪其中一堂 |
@@ -190,6 +192,48 @@ git restore data/schedule.yaml
 # 已 commit 想 revert
 git revert HEAD
 ```
+
+### slot 別名 vs 直接 --time
+
+**slot 別名（S3-S10 等）= 當下季常用時段的快速命名**，方便你打字省略；不是永久 schema。
+- 排當下常用時段：`--slot S3`（系統會自動把對應的時段時間凍結進 schedule）
+- 排不在常用清單的時段：`--time "15:00-16:00"`（直接寫，不用發明 slot id）
+- 每條 schedule 內部都有 `time` 欄位凍結時段值；之後 Hang 改 `slots[].time` 不會打到過去的 schedule
+
+### 補課 / 挪課（單堂）
+
+「乖乖 7/8 那堂颱風停課，改到 7/11 週六補」：
+
+```bash
+python scripts/schedule_cli.py --json move-lesson \
+  --class STU-04 --from-date 2026-07-08 --to-date 2026-07-11 \
+  --note "颱風停課改週六補" --apply
+```
+
+行為：原 schedule 自動加 `except_dates: [2026-07-08]`（跳過該日且不算進 total_lessons）+ 新增一條 specific_dates 補課條目到 7/11。要改時段一起改用 `--to-time "下午時段"` 或 `--to-slot S5`。
+
+### 換時段不動過去（中段切換）
+
+「英特兒 STU-05 開學後 9/1 起，從每週一四 改成每週二四 16 週」：
+
+```bash
+python scripts/schedule_cli.py --json split-schedule \
+  --class STU-05 --at 2026-09-01 --days tue,thu --weeks 16 \
+  --note "開學換時段" --apply
+```
+
+行為：原 schedule 被截到 8/31（前段 = 暑假紀錄不動）；新建後段從 9/1 開始 days=tue/thu 跑 16 週。**過去歷史完整保留**。
+
+可選參數：
+- 後段換時段：加 `--to-slot S5` 或 `--to-time "13:00-14:00"`
+- 後段終止：`--weeks N` / `--end YYYY-MM-DD` / `--lessons N`（**必須選一個**，不然 fail）
+- 該 class 有多條 day/days schedule 時必須用 `--schedule-id SCH-XXX` 明指
+
+### 過渡週的 weekly_count 衝突
+
+split-schedule 過渡週可能會多一堂課（前段結尾 + 後段開頭重疊到同一週），引發 `E_WEEKLY_COUNT_EXCEEDED`。處理方式：
+1. 先 `update-class --weekly-count` 暫時拉高，過渡週後再改回
+2. 或挑下一個週一作為 `--at`，避免跨週
 
 ### 範例：Hang 在 TG 說「STU-11 阿明 每週二四 早上 10:10 從 7/15 排 12 堂」
 
