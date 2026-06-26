@@ -586,6 +586,182 @@ def render_summary(data):
     return "\n".join(html)
 
 
+def render_grid(data, year, month):
+    """渲染 daily grid view：每天一列 × 每時段一欄（8 個時段）
+
+    有課的格子顯示學員名，沒課留空。
+    """
+    slots_by_id = {s["id"]: s for s in data.get("slots", [])}
+    classes_by_id = {c["id"]: c for c in data.get("classes", [])}
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+
+    # 篩選該月 + 排序時段
+    month_lessons = [l for l in all_lessons if l["date"].year == year and l["date"].month == month]
+    slot_ids = sorted(slots_by_id.keys())
+    slot_meta = [(sid, slots_by_id[sid].get("time", "?")) for sid in slot_ids]
+
+    # 找這個月所有有課的日期
+    active_dates = sorted(set(l["date"] for l in month_lessons))
+
+    # 建立 lookup: date -> slot_id -> list of class names
+    grid = {}
+    for l in month_lessons:
+        grid.setdefault(l["date"], {}).setdefault(l["slot_id"], []).append(l["class_name"])
+
+    # 找第一天（週一）— 補空格用
+    first_day = date(year, month, 1)
+    first_weekday = first_day.weekday()  # 0=mon
+    days_before = first_weekday
+    last_day_num = (first_day.replace(day=28) + timedelta(days=4))
+    last_day_num = (last_day_num - timedelta(days=last_day_num.day))
+    # 簡單：用 calendar 找月最後一天
+    import calendar as cal_mod
+    _, last_day_num = cal_mod.monthrange(year, month)
+
+    # 所有該月的日期（用來生成完整網格）
+    all_dates = []
+    for d_num in range(1, last_day_num + 1):
+        all_dates.append(date(year, month, d_num))
+
+    html = ['<!DOCTYPE html>',
+            '<html lang="zh-TW">',
+            '<head>',
+            '<meta charset="UTF-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+            f'<title>每日時段 grid — {year} 年 {month} 月</title>',
+            '<style>',
+            CSS,
+            GRID_CSS,
+            '</style>',
+            '</head>',
+            '<body>',
+            '<header>',
+            '<h1>📅 每日時段 grid</h1>',
+            '<div class="month-nav">',
+            '<a href="index.html">← 回首頁</a>',
+            f'<span class="current">{year} 年 {month} 月</span>',
+    ]
+    # 上一月 / 下一月
+    if month == 1:
+        py, pm = year - 1, 12
+    else:
+        py, pm = year, month - 1
+    if month == 12:
+        ny, nm = year + 1, 1
+    else:
+        ny, nm = year, month + 1
+    html.append(f'<a href="grid-{py}-{pm:02d}.html">← 上一月</a>')
+    html.append(f'<a href="grid-{ny}-{nm:02d}.html">下一月 →</a>')
+    html.append('</div></header>')
+    html.append('<main>')
+
+    html.append('<p class="hint">每列 = 一天。每欄 = 一個時段。空格 = 沒課。</p>')
+    html.append('<div class="grid-wrapper">')
+    html.append('<table class="grid">')
+    # 表頭
+    html.append('<thead><tr>')
+    html.append('<th class="date-col">日期</th>')
+    for sid, stime in slot_meta:
+        html.append(f'<th title="{sid} {stime}">{sid}<br><span class="th-time">{stime}</span></th>')
+    html.append('</tr></thead>')
+    html.append('<tbody>')
+
+    # 每行
+    for d in all_dates:
+        weekday = d.weekday()
+        wd_zh = DAY_NAMES_ZH[DAY_NAMES[weekday]]
+        html.append('<tr>')
+        html.append(f'<td class="date-col">{d.strftime("%m/%d")}<br><span class="wd">{wd_zh}</span></td>')
+        for sid, _ in slot_meta:
+            if d in grid and sid in grid[d]:
+                # 列出所有學員（用 / 分隔）
+                names = " / ".join(grid[d][sid])
+                html.append(f'<td class="filled" title="{names}">{names}</td>')
+            else:
+                html.append('<td class="empty"></td>')
+        html.append('</tr>')
+
+    html.append('</tbody></table></div>')
+    html.append('</main>')
+    html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d %H:%M")}</p></footer>')
+    html.append('</body></html>')
+    return "\n".join(html)
+
+
+GRID_CSS = """
+.grid-wrapper {
+  overflow-x: auto;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+table.grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+table.grid th, table.grid td {
+  border: 1px solid var(--border);
+  padding: 6px 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+table.grid thead th {
+  background: var(--accent);
+  color: white;
+  padding: 8px 4px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-size: 11px;
+}
+table.grid thead th .th-time {
+  font-size: 10px;
+  opacity: 0.8;
+}
+table.grid .date-col {
+  background: #f0f4f8;
+  font-weight: bold;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+table.grid .wd {
+  font-size: 10px;
+  color: #888;
+  font-weight: normal;
+}
+table.grid td.empty {
+  background: #fafafa;
+}
+table.grid td.filled {
+  background: #e8f0f5;
+  color: var(--accent);
+  font-weight: 500;
+}
+table.grid tbody tr:hover {
+  background: #f5f5f5;
+}
+table.grid tbody tr:hover td.empty {
+  background: #e8e8e8;
+}
+.hint {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: #faf8e0;
+  border-left: 4px solid var(--accent);
+  border-radius: 4px;
+}
+@media (max-width: 768px) {
+  table.grid { font-size: 10px; }
+  table.grid th, table.grid td { padding: 4px 2px; }
+}
+"""
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--out", default=str(ROOT / "docs" / "index.html"))
