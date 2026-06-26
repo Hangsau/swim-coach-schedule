@@ -79,7 +79,7 @@ def render_month(data, year, month):
             '<html lang="zh-TW">',
             '<head>',
             '<meta charset="UTF-8">',
-            '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.3, maximum-scale=3.0">',
             f'<title>課表 — {year} 年 {month} 月</title>',
             '<style>',
             CSS,
@@ -408,7 +408,7 @@ def render_index(data, available_months):
             '<html lang="zh-TW">',
             '<head>',
             '<meta charset="UTF-8">',
-            '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.3, maximum-scale=3.0">',
             '<title>游泳教練課表</title>',
             '<style>',
             CSS,
@@ -487,7 +487,7 @@ def render_summary(data):
             '<html lang="zh-TW">',
             '<head>',
             '<meta charset="UTF-8">',
-            '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.3, maximum-scale=3.0">',
             '<title>學員總表 — 游泳教練課表</title>',
             '<style>',
             CSS,
@@ -598,7 +598,7 @@ def render_grid(data, year, month):
             '<html lang="zh-TW">',
             '<head>',
             '<meta charset="UTF-8">',
-            '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.3, maximum-scale=3.0">',
             f'<title>每日時段 grid — {year} 年 {month} 月</title>',
             '<style>',
             CSS,
@@ -658,6 +658,33 @@ def render_grid(data, year, month):
         html.append('</tr>')
 
     html.append('</tbody></table></div>')
+
+    # 月統計（同 render_month 的 aside.month-stats）
+    from collections import Counter
+    slot_count = Counter()
+    class_count = Counter()
+    for l in month_lessons:
+        slot_count[l["slot_id"]] += 1
+        class_count[l["class_name"]] += 1
+    total = sum(slot_count.values())
+
+    html.append('<aside class="month-stats">')
+    html.append(f'<h2>📊 {year} 年 {month} 月統計</h2>')
+    html.append(f'<div class="stat-total">總堂數：<strong>{total}</strong> 堂</div>')
+    html.append('<table class="calendar"><thead><tr><th>時段</th><th>堂數</th></tr></thead><tbody>')
+    def _gs_key(sid):
+        t = slots_by_id.get(sid, {}).get("time", "99:99-99:99")
+        return t.split("-")[0].strip()
+    for sid in sorted(slot_count.keys(), key=_gs_key):
+        slot = slots_by_id.get(sid, {})
+        html.append(f'<tr><td>{slot.get("time","?")} {slot.get("note","")}（{sid}）</td><td>{slot_count[sid]}</td></tr>')
+    html.append('</tbody></table>')
+    html.append('<table class="calendar"><thead><tr><th>學員</th><th>堂數</th></tr></thead><tbody>')
+    for cname in sorted(class_count.keys()):
+        html.append(f'<tr><td>{cname}</td><td>{class_count[cname]}</td></tr>')
+    html.append('</tbody></table>')
+    html.append('</aside>')
+
     html.append('</main>')
     html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d")}</p></footer>')
     html.append('</body></html>')
@@ -732,8 +759,19 @@ table.grid tbody tr:hover td.empty {
   border-radius: 4px;
 }
 @media (max-width: 768px) {
-  table.grid { font-size: 10px; }
-  table.grid th, table.grid td { padding: 4px 2px; }
+  table.grid { font-size: 9px; }
+  table.grid th, table.grid td { padding: 3px 1px; }
+  table.grid thead th .th-time { font-size: 8px; }
+  /* 提示可 pinch-zoom（用瀏覽器 viewport 縮放） */
+  .grid-wrapper::before {
+    content: "↔ 可橫向滑動，或 pinch-zoom 看全貌";
+    display: block;
+    font-size: 11px;
+    color: #888;
+    padding: 6px;
+    background: #f5f5f5;
+    text-align: center;
+  }
 }
 """
 
