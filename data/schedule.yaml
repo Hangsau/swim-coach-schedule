@@ -60,11 +60,6 @@ classes:
   weekly_count: 1
   level: 待確認
   note: 每週四代課
-- id: STU-08
-  name: 晚間班
-  weekly_count: 5
-  level: 待確認
-  note: 沒指定名稱，每週一到五
 - id: STU-09
   name: 代課（20:10-21:10）
   weekly_count: 1
@@ -141,17 +136,6 @@ schedules:
   start_date: 2026-07-06
   end_date: 2026-08-31
   note: 每週四代課
-- class_id: STU-08
-  days:
-  - mon
-  - tue
-  - wed
-  - thu
-  - fri
-  slot_id: S10
-  start_date: 2026-07-06
-  end_date: 2026-08-31
-  note: 每週一到五
 - class_id: STU-09
   days:
   - thu
