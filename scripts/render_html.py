@@ -297,6 +297,25 @@ main h2 {
   border-bottom: 1px solid var(--border);
   padding-bottom: 6px;
 }
+aside.month-stats {
+  background: white;
+  padding: 16px 20px;
+  margin-top: 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+aside.month-stats h2 { margin-top: 0; }
+.stat-total {
+  font-size: 18px;
+  padding: 12px;
+  background: var(--accent);
+  color: white;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.stat-total strong { font-size: 24px; }
 table.calendar th, table.calendar td { padding: 8px; vertical-align: top; }
 table.calendar th { background: var(--accent); color: white; }
 .month-list {
