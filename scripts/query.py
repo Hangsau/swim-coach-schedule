@@ -99,8 +99,11 @@ def expand_schedule(schedules, slots_by_id, classes_by_id):
                 if "end_date" in s:
                     end = _to_date(s["end_date"]) + timedelta(days=1)
                     use_end = True
+                elif "duration_weeks" in s:
+                    end = start + timedelta(weeks=s["duration_weeks"])
+                    use_end = False
                 else:
-                    end = start + timedelta(weeks=7)
+                    end = start + timedelta(weeks=12)  # 預設 12 週
                     use_end = False
                 max_lessons = s.get("total_lessons", 99999)  # 預設無限
                 current = start
