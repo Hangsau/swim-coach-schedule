@@ -349,6 +349,7 @@ def render_index(data, available_months):
     html.append('<span class="current">全部月份</span>')
     html.append('</div></header>')
     html.append('<main>')
+    html.append('<main>')
 
     if future_lessons:
         html.append('<h2>從今天起的課程</h2>')
