@@ -87,24 +87,10 @@ schedules:
     duration_weeks: 12
     note: 每週四 10:10-11:10
 
-  # 乖乖：每週一、二、三，從 7/1 起，end 到 8/18（20 堂：6 週完整 18 堂 + 第 7 週只到週二 2 堂）
+  # 乖乖：每週一、二、三，從 7/1 起，排到 20 堂就停
   - class_id: STU-04
-    day: mon
+    days: [mon, tue, wed]
     slot_id: S5
     start_date: 2026-07-01
-    end_date: 2026-08-18
-    note: 每週一 13:00-14:00
-
-  - class_id: STU-04
-    day: tue
-    slot_id: S5
-    start_date: 2026-07-01
-    end_date: 2026-08-18
-    note: 每週二 13:00-14:00
-
-  - class_id: STU-04
-    day: wed
-    slot_id: S5
-    start_date: 2026-07-01
-    end_date: 2026-08-18
-    note: 每週三 13:00-14:00（最後一週 8/19 不上）
+    total_lessons: 20
+    note: 7/1 開始，每週一二三，排到 20 堂結束

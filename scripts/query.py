@@ -66,30 +66,52 @@ def expand_schedule(schedules, slots_by_id, classes_by_id):
                     "note": s.get("note", ""),
                 })
         else:
-            # 重複模式（每週）
-            start = _to_date(s["start_date"])
-            # end_date 優先，否則用 duration_weeks 算
-            if "end_date" in s:
-                end = _to_date(s["end_date"]) + timedelta(days=1)  # 含當天
-            else:
-                end = start + timedelta(weeks=s["duration_weeks"])
-            target_day = DAY_NAMES.index(s["day"])
-            days_ahead = (target_day - start.weekday()) % 7
-            first_date = start + timedelta(days=days_ahead)
-            current = first_date
-            while current < end:
-                expanded.append({
-                    "date": current,
-                    "day": s["day"],
-                    "slot_id": s["slot_id"],
-                    "slot_time": slot.get("time", "?"),
-                    "slot_note": slot.get("note", ""),
-                    "class_id": s["class_id"],
-                    "class_name": cls.get("name", "?"),
-                    "level": cls.get("level", ""),
-                    "note": s.get("note", ""),
-                })
-                current += timedelta(days=7)
+            # 模式 A：每週固定（day + duration_weeks / end_date）
+            if "day" in s:
+                start = _to_date(s["start_date"])
+                if "end_date" in s:
+                    end = _to_date(s["end_date"]) + timedelta(days=1)
+                else:
+                    end = start + timedelta(weeks=s["duration_weeks"])
+                target_day = DAY_NAMES.index(s["day"])
+                days_ahead = (target_day - start.weekday()) % 7
+                first_date = start + timedelta(days=days_ahead)
+                current = first_date
+                while current < end:
+                    expanded.append({
+                        "date": current,
+                        "day": s["day"],
+                        "slot_id": s["slot_id"],
+                        "slot_time": slot.get("time", "?"),
+                        "slot_note": slot.get("note", ""),
+                        "class_id": s["class_id"],
+                        "class_name": cls.get("name", "?"),
+                        "level": cls.get("level", ""),
+                        "note": s.get("note", ""),
+                    })
+                    current += timedelta(days=7)
+            # 模式 B：多日 + 跑到 N 堂（days + total_lessons）
+            elif "days" in s and "total_lessons" in s:
+                start = _to_date(s["start_date"])
+                target_day_set = set(DAY_NAMES.index(d) for d in s["days"])
+                current = start
+                count = 0
+                while count < s["total_lessons"]:
+                    if current.weekday() in target_day_set:
+                        actual_day = DAY_NAMES[current.weekday()]
+                        expanded.append({
+                            "date": current,
+                            "day": actual_day,
+                            "slot_id": s["slot_id"],
+                            "slot_time": slot.get("time", "?"),
+                            "slot_note": slot.get("note", ""),
+                            "class_id": s["class_id"],
+                            "class_name": cls.get("name", "?"),
+                            "level": cls.get("level", ""),
+                            "note": s.get("note", ""),
+                        })
+                        count += 1
+                    current += timedelta(days=1)
     return expanded
 
 
