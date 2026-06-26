@@ -177,6 +177,9 @@ def render_month(data, year, month):
                 cls = "today" if is_today else ""
                 html.append(f'<td class="{cls}">')
                 html.append(f'<div class="day-num">{day}</div>')
+                # 該日堂數標籤
+                if d in by_date and by_date[d]:
+                    html.append(f'<span class="day-count">{len(by_date[d])} 堂</span>')
                 if d in by_date:
                     for l in by_date[d]:
                         html.append('<div class="lesson">')
@@ -289,6 +292,16 @@ table.calendar td .day-num {
   font-weight: bold;
   font-size: 14px;
   margin-bottom: 4px;
+}
+.day-count {
+  display: inline-block;
+  font-size: 11px;
+  background: #e0e8f0;
+  color: var(--accent);
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  font-weight: bold;
 }
 table.calendar td .lesson {
   background: var(--lesson-bg);
