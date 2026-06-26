@@ -62,11 +62,6 @@ classes:
   weekly_count: 5
   level: 待確認
   note: 沒指定名稱，每週一到五
-- id: STU-10
-  name: 個別班
-  weekly_count: 5
-  level: 待確認
-  note: 一對一 / 小班
 schedules:
 - class_id: STU-01
   day: wed
