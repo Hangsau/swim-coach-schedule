@@ -32,6 +32,9 @@ slots:
   - id: S10
     time: "20:10-21:10"
     note: 晚上 8 點 10
+  - id: S11
+    time: "18:30-19:30"
+    note: 傍晚 6 點半
 
 # 班級 / 學員
 classes:
@@ -86,6 +89,12 @@ classes:
     weekly_count: 1
     level: 待確認
     note: 每週四代課
+
+  - id: STU-10
+    name: 個別班
+    weekly_count: 5
+    level: 待確認
+    note: 一對一 / 小班
 
 # 排定的課
 schedules:
@@ -179,3 +188,11 @@ schedules:
     start_date: 2026-07-06
     end_date: 2026-08-31
     note: 每週四代課
+
+  # 個別班：每週一到五，從 7/6 起 3 週（15 堂），S11 18:30-19:30
+  - class_id: STU-10
+    days: [mon, tue, wed, thu, fri]
+    slot_id: S11
+    start_date: 2026-07-06
+    duration_weeks: 3
+    note: 個別班（user 2026-06-26 提供）
