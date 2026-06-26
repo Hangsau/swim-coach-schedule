@@ -103,10 +103,10 @@ schedules:
     total_lessons: 20
     note: 7/1 開始，每週一二三，排到 20 堂結束
 
-  # 英特兒：每週一、四，從 7/6 起，排到 13 堂就停
+  # 英特兒：每週一、四，從 7/6 起，排到 16 堂就停（= 8 週）
   - class_id: STU-05
     days: [mon, thu]
     slot_id: S6
     start_date: 2026-07-06
-    total_lessons: 13
-    note: 7/6 開始，每週一四，排到 13 堂結束
+    total_lessons: 16
+    note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
