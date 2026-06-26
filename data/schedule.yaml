@@ -20,18 +20,18 @@ classes:
     level: 待確認
     note: 用戶 2026-06-26 提供：「名字之後再確認」
 
-# 排定的課
+# 排定的課（從 7/3 開始，共 8 週 = 16 堂）
 schedules:
   - class_id: STU-01
     day: wed
     slot_id: S3
-    start_date: 2026-06-26
+    start_date: 2026-07-03
     duration_weeks: 8
-    note: 每週三 9:00-10:00，共 16 堂中的 8 堂
+    note: 每週三 9:00-10:00
 
   - class_id: STU-01
     day: fri
     slot_id: S3
-    start_date: 2026-06-26
+    start_date: 2026-07-03
     duration_weeks: 8
-    note: 每週五 9:00-10:00，共 16 堂中的 8 堂
+    note: 每週五 9:00-10:00
