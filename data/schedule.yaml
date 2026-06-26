@@ -1,3 +1,4 @@
+schema_version: 2
 slots:
 - id: S3
   time: 09:00-10:00
@@ -67,24 +68,17 @@ classes:
   weekly_count: 1
   level: 待確認
   note: 每週四代課
-- id: STU-10
-  name: 個別班
-  weekly_count: 5
-  level: 待確認
-  note: 一對一 / 小班
 schedules:
 - class_id: STU-01
   day: wed
   slot_id: S3
   start_date: 2026-07-03
   duration_weeks: 8
-  note: 每週三 9:00-10:00
 - class_id: STU-01
   day: fri
   slot_id: S3
   start_date: 2026-07-03
   duration_weeks: 8
-  note: 每週五 9:00-10:00
 - class_id: STU-02
   slot_id: S3
   specific_dates:
@@ -100,13 +94,11 @@ schedules:
   slot_id: S4
   start_date: 2026-07-02
   duration_weeks: 12
-  note: 每週一 10:10-11:10
 - class_id: STU-03
   day: thu
   slot_id: S4
   start_date: 2026-07-02
   duration_weeks: 12
-  note: 每週四 10:10-11:10
 - class_id: STU-04
   days:
   - mon
@@ -153,7 +145,6 @@ schedules:
   slot_id: S9
   start_date: 2026-07-06
   end_date: 2026-08-31
-  note: 每週一到五
 - class_id: STU-09
   days:
   - thu
