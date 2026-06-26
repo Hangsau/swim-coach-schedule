@@ -317,6 +317,50 @@ table.calendar th { background: var(--accent); color: white; }
   font-weight: bold;
 }
 .month-link a:hover { background: var(--accent); color: white; }
+.summary-block {
+  background: white;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.summary-block h2 {
+  color: var(--accent);
+  font-size: 18px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.summary-block .count {
+  font-size: 14px;
+  background: var(--accent);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+.summary-block .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 12px;
+}
+.summary-block .meta span { background: #f5f5f5; padding: 4px 10px; border-radius: 4px; }
+.summary-block.total {
+  background: #faf8e0;
+  border-color: var(--accent);
+}
+.summary-block table { width: 100%; font-size: 13px; }
+.summary-block table th,
+.summary-block table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+}
+.summary-block table th { background: #f5f5f5; font-weight: bold; }
 @media (max-width: 768px) {
   body { padding: 10px; }
   table.calendar th, table.calendar td { padding: 4px; height: 80px; }
@@ -446,6 +490,13 @@ def main():
         out = Path(args.out)
         out.write_text(index_html, encoding="utf-8")
         print(f"\n✓ index.html ({len(index_html)} chars)")
+
+        # summary.html
+        summary_html = render_summary(data)
+        summary_path = docs_dir / "summary.html"
+        summary_path.write_text(summary_html, encoding="utf-8")
+        print(f"✓ summary.html ({len(summary_html)} chars)")
+
         print(f"  共 {len(months)} 個月")
 
 
