@@ -3,6 +3,12 @@
 > 個人游泳教練的課表 + 查詢工具
 > 一個 YAML 檔 + 一個 CLI script，沒別的依賴
 
+## 🌐 線上版
+
+**https://hangsau.github.io/swim-coach-schedule/**（月曆 view）
+
+> GitHub Pages 自動 build + deploy。每次 push main 後 30 秒內更新。
+
 ---
 
 ## 用法
