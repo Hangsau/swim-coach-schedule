@@ -13,6 +13,18 @@ import re
 from pathlib import Path
 from collections import defaultdict
 
+def parse_time_str(s):
+    h, m = s.split(":")
+    return int(h) * 60 + int(m)
+
+def time_overlap(s1, s2):
+    s1s, s1e = parse_time_str(s1.split("-")[0]), parse_time_str(s1.split("-")[1])
+    s2s, s2e = parse_time_str(s2.split("-")[0]), parse_time_str(s2.split("-")[1])
+    return s1s < s2e and s2s < s1e
+
+
+
+
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -104,6 +116,44 @@ def test_no_slot_double_booking():
     print(f"✓ 沒有同日同時段跨班衝突")
 
 
+def test_no_reserved_slot_conflict():
+    """沒有 schedule 跟 reserved slots 時間區段重疊（user 已有課的時段被標記為 reserved）"""
+    data = load()
+    slots_by_id = {s['id']: s for s in data.get('slots', [])}
+    reserved = data.get('reserved', [])
+    all_lessons = expand_schedule(data.get('schedules', []), slots_by_id, {c['id']: c for c in data.get('classes', [])})
+
+    conflicts = []
+    for r in reserved:
+        r_time = r.get('time', '')
+        if not r_time:
+            continue
+        for l in all_lessons:
+            l_time = l.get('slot_time', '')
+            if not l_time:
+                continue
+            if time_overlap(r_time, l_time):
+                conflicts.append((r, l))
+
+    if conflicts:
+        for r, l in conflicts:
+            print(f"  ✗ {r['id']} ({r['time']}) 跟 {l['date']} {l['day']} {l['slot_id']} ({l['slot_time']}) 重疊 → {l['class_name']}")
+        assert False, f"發現 {len(conflicts)} 個 reserved slot 衝突（你已說有課的時段不該排新課）"
+    print(f"✓ 沒有 reserved slot 衝突")
+
+
+def test_time_overlap_basic():
+    """時間區段重疊偵測（基礎函式）"""
+    assert time_overlap("09:00-10:00", "09:00-10:00") == True
+    assert time_overlap("09:00-10:00", "10:00-11:00") == False
+    assert time_overlap("09:00-10:00", "09:30-10:30") == True
+    assert time_overlap("09:00-10:00", "08:30-09:30") == True
+    assert time_overlap("18:00-19:00", "18:30-19:30") == True
+    assert time_overlap("19:10-20:10", "18:30-19:30") == True
+    assert time_overlap("18:00-19:00", "19:00-20:00") == False
+    print("✓ 時間重疊基礎函式正確")
+
+
 def test_all_references_valid():
     """所有 schedule 引用都有效（slot_id 和 class_id 都存在）"""
     data = load()
@@ -158,6 +208,8 @@ if __name__ == "__main__":
     test_duration_weeks_respected()
     test_no_class_double_booking()
     test_no_slot_double_booking()
+    test_no_reserved_slot_conflict()
+    test_time_overlap_basic()
     test_all_references_valid()
     print("\n--- HTML 內容檢查 ---")
     test_html_contains_all_class_names()

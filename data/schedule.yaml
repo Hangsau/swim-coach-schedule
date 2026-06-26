@@ -70,11 +70,6 @@ classes:
   weekly_count: 1
   level: 待確認
   note: 每週四代課
-- id: STU-10
-  name: 個別班
-  weekly_count: 5
-  level: 待確認
-  note: 一對一 / 小班
 schedules:
 - class_id: STU-01
   day: wed
@@ -164,14 +159,10 @@ schedules:
   start_date: 2026-07-06
   end_date: 2026-08-31
   note: 每週四代課
-- class_id: STU-10
-  days:
-  - mon
-  - tue
-  - wed
-  - thu
-  - fri
-  slot_id: S9
-  start_date: 2026-07-06
-  duration_weeks: 3
-  note: 個別班（user 2026-06-26 提供）
+reserved:
+- id: R1
+  time: 18:00-19:00
+  note: 已有課（user 2026-06-26 告知）
+- id: R2
+  time: 19:10-20:10
+  note: 已有課（user 2026-06-26 告知）
