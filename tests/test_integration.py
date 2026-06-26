@@ -6,6 +6,7 @@ test_integration.py — render 整合測試
 2. 每個班總堂數 > 0
 3. 沒有空 grid（每班每月至少有一堂）
 4. 沒有時段重複（同一班同時段不會出現兩次）
+5. duration_weeks 正確生效（不會跑成 default 12 週）
 """
 import sys
 import re
@@ -43,6 +44,23 @@ def test_all_classes_have_lessons():
         lessons = [l for l in all_lessons if l['class_id'] == c['id']]
         assert len(lessons) > 0, f"class {c['id']} ({c['name']}) 沒課"
     print(f"✓ 所有 {len(data.get('classes', []))} 個 class 都有課")
+
+
+def test_duration_weeks_respected():
+    """days + duration_weeks 模式要跑正確的週數（不會跑成 default 12 週）"""
+    data = load()
+    slots_by_id = {s['id']: s for s in data.get('slots', [])}
+    classes_by_id = {c['id']: c for c in data.get('classes', [])}
+    all_lessons = expand_schedule(data.get('schedules', []), slots_by_id, classes_by_id)
+
+    for s in data.get('schedules', []):
+        if 'days' in s and 'duration_weeks' in s:
+            lessons = [l for l in all_lessons if l['class_id'] == s['class_id'] and l['slot_id'] == s['slot_id']]
+            expected = s['duration_weeks'] * len(s['days'])
+            actual = len(lessons)
+            assert abs(actual - expected) <= 1, \
+                f"schedule {s['class_id']} {s['slot_id']} days={s['days']} duration_weeks={s['duration_weeks']} 預期 {expected} 堂，實際 {actual} 堂（可能被 default 12 週覆蓋）"
+    print(f"✓ 所有 days + duration_weeks 模式都跑正確的週數")
 
 
 def test_no_class_double_booking():
@@ -137,6 +155,7 @@ if __name__ == "__main__":
     print("=" * 50)
     test_all_schedules_have_lessons()
     test_all_classes_have_lessons()
+    test_duration_weeks_respected()
     test_no_class_double_booking()
     test_no_slot_double_booking()
     test_all_references_valid()
