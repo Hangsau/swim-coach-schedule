@@ -188,6 +188,31 @@ def render_month(data, year, month):
 
     html.append('</tbody></table>')
     html.append('</main>')
+
+    # 月統計
+    from collections import Counter
+    slot_count = Counter()
+    class_count = Counter()
+    for day_lessons in by_date.values():
+        for l in day_lessons:
+            slot_count[l["slot_id"]] += 1
+            class_count[l["class_name"]] += 1
+    total = sum(slot_count.values())
+
+    html.append('<aside class="month-stats">')
+    html.append(f'<h2>📊 {year} 年 {month} 月統計</h2>')
+    html.append(f'<div class="stat-total">總堂數：<strong>{total}</strong> 堂</div>')
+    html.append('<table class="calendar"><thead><tr><th>時段</th><th>堂數</th></tr></thead><tbody>')
+    for sid in sorted(slot_count.keys()):
+        slot = slots_by_id.get(sid, {})
+        html.append(f'<tr><td>{sid} {slot.get("time","?")} {slot.get("note","")}</td><td>{slot_count[sid]}</td></tr>')
+    html.append('</tbody></table>')
+    html.append('<table class="calendar"><thead><tr><th>學員</th><th>堂數</th></tr></thead><tbody>')
+    for cname in sorted(class_count.keys()):
+        html.append(f'<tr><td>{cname}</td><td>{class_count[cname]}</td></tr>')
+    html.append('</tbody></table>')
+    html.append('</aside>')
+
     html.append('<footer>')
     html.append(f'<p>更新時間：{datetime.now().strftime("%Y-%m-%d %H:%M")}</p>')
     html.append('</footer>')
