@@ -152,14 +152,48 @@ def validate_schema(data, strict=False):
 
         cid = s.get("class_id")
         sid = s.get("slot_id")
+        s_time = s.get("time")
         if cid not in class_id_set:
             errors.append(_err("E_CLASS_NOT_FOUND",
                                f"schedules[{i}].class_id={cid} 不存在於 classes",
                                path=f"schedules[{i}].class_id", value=cid))
-        if sid not in slot_id_set:
+        # slot_id 或 time 至少要有一個
+        if not sid and not s_time:
+            errors.append(_err("E_SCHEMA_INVALID",
+                               f"schedules[{i}] slot_id 或 time 至少需一個",
+                               path=f"schedules[{i}]"))
+        if sid and sid not in slot_id_set:
             errors.append(_err("E_SLOT_NOT_FOUND",
                                f"schedules[{i}].slot_id={sid} 不存在於 slots",
                                path=f"schedules[{i}].slot_id", value=sid))
+        # time 格式驗（凍結時段）
+        if s_time:
+            if not isinstance(s_time, str) or not TIME_RE.match(s_time):
+                errors.append(_err("E_SCHEMA_INVALID",
+                                   f"schedules[{i}].time 格式須為 HH:MM-HH:MM",
+                                   path=f"schedules[{i}].time", got=s_time))
+            else:
+                ts = parse_time_str(s_time.split("-")[0])
+                te = parse_time_str(s_time.split("-")[1])
+                if ts >= te:
+                    errors.append(_err("E_INVALID_DATE_RANGE",
+                                       f"schedules[{i}].time start>=end",
+                                       path=f"schedules[{i}].time", got=s_time))
+        # except_dates 格式驗
+        ed_list = s.get("except_dates") or []
+        if ed_list:
+            if not isinstance(ed_list, list):
+                errors.append(_err("E_SCHEMA_INVALID",
+                                   f"schedules[{i}].except_dates 必須是 list",
+                                   path=f"schedules[{i}].except_dates"))
+            else:
+                for j, d in enumerate(ed_list):
+                    try:
+                        _to_date(d)
+                    except Exception:
+                        errors.append(_err("E_SCHEMA_INVALID",
+                                           f"schedules[{i}].except_dates[{j}] 解析失敗",
+                                           path=f"schedules[{i}].except_dates[{j}]", got=str(d)))
 
         # day vs days vs specific_dates 互斥
         has_day = "day" in s
@@ -311,7 +345,11 @@ def validate_cross(data, strict=False):
             continue
         if s.get("class_id") not in classes_by_id:
             continue
-        if s.get("slot_id") not in slots_by_id:
+        # slot_id 可選；若有則須在 slots 內；若無則必須有 time
+        sid = s.get("slot_id")
+        if sid is not None and sid not in slots_by_id:
+            continue
+        if sid is None and not s.get("time"):
             continue
         if "days" in s:
             ds = s.get("days") or []

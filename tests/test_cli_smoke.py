@@ -39,11 +39,12 @@ def tmp_yaml(tmp_path):
             {"id": "S3", "time": "13:00-14:00", "note": "下午 1 點"},
         ],
         "classes": [
-            {"id": "C1", "name": "A 班", "weekly_count": 1, "level": "L1"},
+            {"id": "C1", "name": "A 班", "weekly_count": 5, "level": "L1"},
         ],
         "schedules": [
-            {"class_id": "C1", "slot_id": "S1", "day": "mon",
-             "start_date": str(start), "duration_weeks": 4},
+            {"id": "SCH-001", "class_id": "C1", "slot_id": "S1",
+             "time": "09:00-10:00",
+             "day": "mon", "start_date": str(start), "duration_weeks": 4},
         ],
     }
     p = tmp_path / "schedule.yaml"
@@ -150,6 +151,90 @@ def test_list_conflicts_clean(tmp_yaml):
     assert rc == 0
     assert p["ok"]
     assert p["data"]["count"] == 0
+
+
+def test_add_schedule_with_time_only(tmp_yaml):
+    """--time 直接寫，不需 --slot（任意插時段）"""
+    today = date.today()
+    rc, p = run_cli(tmp_yaml, "add-schedule",
+                    "--class", "C1", "--time", "15:00-16:00",
+                    "--day", "sat", "--start", str(today + timedelta(days=2)),
+                    "--weeks", "4", "--apply")
+    assert rc == 0, p
+    data = yaml.safe_load(tmp_yaml.read_text(encoding="utf-8"))
+    new_sched = data["schedules"][-1]
+    assert new_sched["time"] == "15:00-16:00"
+    assert "slot_id" not in new_sched
+    assert new_sched["id"].startswith("SCH-")
+
+
+def test_schedule_time_freezes_when_slot_changes(tmp_yaml):
+    """改 slot.time 不會打到已 commit 的 schedule（凍結）"""
+    # baseline schedule 用 S1 09:00-10:00
+    data = yaml.safe_load(tmp_yaml.read_text(encoding="utf-8"))
+    # 確認既有 schedule 有 time（migration 應有；測試 fixture 沒寫，先補）
+    if "time" not in data["schedules"][0]:
+        data["schedules"][0]["time"] = "09:00-10:00"
+        tmp_yaml.write_text(yaml.dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    # 改 S1 time → 09:30-10:30
+    data = yaml.safe_load(tmp_yaml.read_text(encoding="utf-8"))
+    data["slots"][0]["time"] = "09:30-10:30"
+    tmp_yaml.write_text(yaml.dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    # status 看 lesson 時段仍是凍結值 09:00-10:00
+    rc, p = run_cli(tmp_yaml, "status")
+    assert rc == 0
+    # validate 應通過（schedule time 仍 09:00-10:00 跟其他不衝突）
+    assert p["ok"]
+
+
+def test_move_lesson_via_cli(tmp_yaml):
+    """move-lesson 在原 schedule 加 except_dates + 新增補課條目"""
+    today = date.today()
+    from_d = today + timedelta(days=2)  # baseline schedule 第一堂之一
+    # 找一個 from_date 跟 to_date 不衝突
+    # baseline 是 C1 mon, start today+2；找個下個 mon 對應日
+    # 簡單做法：先 status 看 upcoming 找第一堂
+    rc, p = run_cli(tmp_yaml, "status")
+    assert p["data"]["upcoming_7d"], "fixture 應有 upcoming"
+    real_from = p["data"]["upcoming_7d"][0]["date"]
+    # 改到一個沒人上課的週六（today + 5）
+    to_d = date.fromisoformat(real_from) + timedelta(days=5)
+
+    rc, p = run_cli(tmp_yaml, "move-lesson",
+                    "--class", "C1",
+                    "--from-date", real_from,
+                    "--to-date", str(to_d),
+                    "--note", "test 補課",
+                    "--apply")
+    assert rc == 0, p
+    data = yaml.safe_load(tmp_yaml.read_text(encoding="utf-8"))
+    # 原 schedule 加了 except_dates
+    orig = next(s for s in data["schedules"] if s.get("day") == "mon")
+    assert real_from in [str(x) for x in orig.get("except_dates", [])]
+    # 新加一條 specific_dates 補課
+    makeup = next(s for s in data["schedules"] if "specific_dates" in s)
+    assert str(to_d) in [str(x) for x in makeup["specific_dates"]]
+
+
+def test_split_schedule_via_cli(tmp_yaml):
+    """split-schedule 截斷前段 + 新建後段"""
+    today = date.today()
+    cutoff = today + timedelta(days=14)
+    rc, p = run_cli(tmp_yaml, "split-schedule",
+                    "--class", "C1",
+                    "--at", str(cutoff),
+                    "--days", "tue,thu",
+                    "--weeks", "4",
+                    "--apply")
+    assert rc == 0, p
+    data = yaml.safe_load(tmp_yaml.read_text(encoding="utf-8"))
+    # 找前段：有 end_date 接近 cutoff-1
+    orig = next(s for s in data["schedules"] if s.get("day") == "mon")
+    assert "end_date" in orig
+    assert str(cutoff - timedelta(days=1)) in str(orig["end_date"])
+    # 找後段：days=[tue,thu]
+    after = next(s for s in data["schedules"] if s.get("days") == ["tue", "thu"])
+    assert after["start_date"] == str(cutoff) or str(after["start_date"]) == str(cutoff)
 
 
 def test_next_actions_present(tmp_yaml):

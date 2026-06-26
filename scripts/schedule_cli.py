@@ -327,7 +327,14 @@ def cmd_add_schedule(args):
                                    available=[c.get("id") for c in classes])],
                       next_actions=["先 add-class，或檢查 class id 拼字"]),
              args.json)
-    if not any(s.get("id") == args.slot_id for s in slots):
+    # --slot 跟 --time 至少一個
+    if not args.slot_id and not args.time:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   "--slot 跟 --time 至少要指定一個")],
+                      next_actions=["用 list-slots 看常用時段；或直接 --time HH:MM-HH:MM"]),
+             args.json)
+    if args.slot_id and not any(s.get("id") == args.slot_id for s in slots):
         emit(envelope(False,
                       errors=[_err("E_SLOT_NOT_FOUND", f"slot {args.slot_id} 不存在",
                                    available=[s.get("id") for s in slots])]),
@@ -338,7 +345,19 @@ def cmd_add_schedule(args):
                       errors=[_err("E_SCHEMA_INVALID",
                                    "day / days / specific-dates 必須恰指定一個")]),
              args.json)
-    new_sched = {"class_id": args.class_id, "slot_id": args.slot_id}
+    # 自動賦予 schedule id
+    existing_ids = [s.get("id", "") for s in data.get("schedules", []) if s.get("id", "").startswith("SCH-")]
+    max_n = max([int(x.split("-")[1]) for x in existing_ids if x.split("-")[1].isdigit()] + [0])
+    new_id = f"SCH-{max_n + 1:03d}"
+    new_sched = {"id": new_id, "class_id": args.class_id}
+    if args.slot_id:
+        new_sched["slot_id"] = args.slot_id
+    # time 凍結值：優先 --time，否則從 slot 抄
+    if args.time:
+        new_sched["time"] = args.time
+    elif args.slot_id:
+        slot_def = next(s for s in slots if s.get("id") == args.slot_id)
+        new_sched["time"] = slot_def.get("time")
     if args.start:
         new_sched["start_date"] = args.start
     if args.day:
@@ -358,6 +377,177 @@ def cmd_add_schedule(args):
     new_data = copy.deepcopy(data)
     new_data.setdefault("schedules", []).append(new_sched)
     _commit_or_preview(args, new_data, {"added_schedule": new_sched})
+
+
+def cmd_move_lesson(args):
+    """挪一堂課：在原 schedule 加 except_dates 排除原日 + 新增 specific_dates 補課條目"""
+    data = load_yaml(args.file)
+    schedules = data.get("schedules", []) or []
+    slots_by_id = {s["id"]: s for s in data.get("slots", []) if s.get("id")}
+    classes_by_id = {c["id"]: c for c in data.get("classes", []) if c.get("id")}
+    # 找命中該 (class, from_date) 的 schedule（透過 expand 確認原日真的有課）
+    lessons = expand_schedule(schedules, slots_by_id, classes_by_id)
+    from_date = datetime.strptime(args.from_date, "%Y-%m-%d").date()
+    matched = [l for l in lessons if l["class_id"] == args.class_id and l["date"] == from_date]
+    if not matched:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   f"class {args.class_id} 在 {args.from_date} 沒有原本的課")]),
+             args.json)
+    if len(matched) > 1:
+        emit(envelope(False,
+                      errors=[_err("E_AMBIGUOUS_TARGET",
+                                   f"{args.class_id} {args.from_date} 同日有 {len(matched)} 堂",
+                                   matches=matched)]),
+             args.json)
+    src = matched[0]
+    src_sched_id = src.get("schedule_id")
+    if not src_sched_id:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   "原 schedule 沒有 id（需要 migration）")]),
+             args.json)
+    new_data = copy.deepcopy(data)
+    # 在原 schedule 加 except_dates
+    for s in new_data["schedules"]:
+        if s.get("id") == src_sched_id:
+            ed = list(s.get("except_dates") or [])
+            ed.append(args.from_date)
+            s["except_dates"] = sorted(ed)
+            break
+    # 新增 specific_dates 補課條目
+    existing_ids = [s.get("id", "") for s in new_data["schedules"] if s.get("id", "").startswith("SCH-")]
+    max_n = max([int(x.split("-")[1]) for x in existing_ids if x.split("-")[1].isdigit()] + [0])
+    makeup = {
+        "id": f"SCH-{max_n + 1:03d}",
+        "class_id": args.class_id,
+        "specific_dates": [args.to_date],
+    }
+    if args.to_time:
+        makeup["time"] = args.to_time
+    elif args.to_slot:
+        slot = slots_by_id.get(args.to_slot)
+        if not slot:
+            emit(envelope(False,
+                          errors=[_err("E_SLOT_NOT_FOUND", f"slot {args.to_slot} 不存在")]),
+                 args.json)
+        makeup["slot_id"] = args.to_slot
+        makeup["time"] = slot.get("time")
+    else:
+        # 同時段移到別日
+        makeup["time"] = src.get("slot_time")
+        if src.get("slot_id"):
+            makeup["slot_id"] = src.get("slot_id")
+    if args.note:
+        makeup["note"] = args.note
+    new_data["schedules"].append(makeup)
+    _commit_or_preview(args, new_data,
+                       {"moved_from": {"date": args.from_date, "schedule_id": src_sched_id},
+                        "moved_to": makeup})
+
+
+def cmd_split_schedule(args):
+    """切某條 schedule：在某日截斷 + 新建後段。過去不動。"""
+    data = load_yaml(args.file)
+    schedules = data.get("schedules", []) or []
+    slots_by_id = {s["id"]: s for s in data.get("slots", []) if s.get("id")}
+    at_date = datetime.strptime(args.at, "%Y-%m-%d").date()
+
+    # 找 schedule
+    target = None
+    if args.schedule_id:
+        target = next((s for s in schedules if s.get("id") == args.schedule_id), None)
+    else:
+        cands = [s for s in schedules if s.get("class_id") == args.class_id
+                 and ("day" in s or "days" in s)]  # specific_dates 不適用 split
+        if not cands:
+            emit(envelope(False,
+                          errors=[_err("E_SCHEMA_INVALID",
+                                       f"class {args.class_id} 沒有可 split 的 schedule（只支援 day/days mode）")]),
+                 args.json)
+        if len(cands) > 1:
+            emit(envelope(False,
+                          errors=[_err("E_AMBIGUOUS_TARGET",
+                                       f"class {args.class_id} 有 {len(cands)} 條 day/days schedule",
+                                       matches=[{"id": c.get("id"),
+                                                 "day": c.get("day"),
+                                                 "days": c.get("days")} for c in cands])],
+                          next_actions=["改用 --schedule-id 指定（例：SCH-005）"]),
+                 args.json)
+        target = cands[0]
+    if target is None:
+        emit(envelope(False, errors=[_err("E_SCHEMA_INVALID", "找不到目標 schedule")]), args.json)
+    if "specific_dates" in target:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   "specific_dates 模式不可 split（直接 remove + add）")]),
+             args.json)
+
+    new_data = copy.deepcopy(data)
+    # 在新版找對應條目
+    new_target = next(s for s in new_data["schedules"] if s.get("id") == target.get("id"))
+
+    cutoff = at_date - timedelta(days=1)  # 前段最後一天
+    new_target["end_date"] = str(cutoff)
+    # 移除其他終止條件（避免衝突）
+    new_target.pop("duration_weeks", None)
+    new_target.pop("total_lessons", None)
+
+    # 建後段
+    existing_ids = [s.get("id", "") for s in new_data["schedules"] if s.get("id", "").startswith("SCH-")]
+    max_n = max([int(x.split("-")[1]) for x in existing_ids if x.split("-")[1].isdigit()] + [0])
+    after = {"id": f"SCH-{max_n + 1:03d}",
+             "class_id": target["class_id"],
+             "start_date": args.at}
+
+    # day/days 來自 args；沒指定就沿用原 schedule
+    if args.day:
+        after["day"] = args.day
+    elif args.days:
+        after["days"] = [d.strip().lower() for d in args.days.split(",") if d.strip()]
+    elif "day" in target:
+        after["day"] = target["day"]
+    elif "days" in target:
+        after["days"] = list(target["days"])
+
+    # slot/time 來自 args；沒指定就沿用
+    if args.to_time:
+        after["time"] = args.to_time
+    elif args.to_slot:
+        slot = slots_by_id.get(args.to_slot)
+        if not slot:
+            emit(envelope(False, errors=[_err("E_SLOT_NOT_FOUND",
+                                              f"slot {args.to_slot} 不存在")]), args.json)
+        after["slot_id"] = args.to_slot
+        after["time"] = slot.get("time")
+    else:
+        if target.get("slot_id"):
+            after["slot_id"] = target["slot_id"]
+        if target.get("time"):
+            after["time"] = target["time"]
+
+    # 終止條件（前段被截斷了，後段必須明確指定一個；不沿用前段 end_date）
+    if args.weeks is not None:
+        after["duration_weeks"] = args.weeks
+    elif args.end:
+        after["end_date"] = args.end
+    elif args.lessons is not None:
+        after["total_lessons"] = args.lessons
+    else:
+        emit(envelope(False,
+                      errors=[_err("E_NO_TERMINATION",
+                                   "後段需要終止條件：--weeks N / --end YYYY-MM-DD / --lessons N")],
+                      next_actions=["再跑一次加上 --weeks 12 或 --end 2026-12-31 等"]),
+             args.json)
+
+    if args.note:
+        after["note"] = args.note
+
+    new_data["schedules"].append(after)
+    _commit_or_preview(args, new_data,
+                       {"split_at": args.at,
+                        "before": {"id": target.get("id"), "end_date": str(cutoff)},
+                        "after": after})
 
 
 def cmd_remove_schedule(args):
@@ -435,7 +625,8 @@ def build_parser():
 
     asd = sub.add_parser("add-schedule", help="新增 schedule")
     asd.add_argument("--class", dest="class_id", required=True)
-    asd.add_argument("--slot", dest="slot_id", required=True)
+    asd.add_argument("--slot", dest="slot_id", help="當下常用時段別名（list-slots 看清單）；可省略改用 --time")
+    asd.add_argument("--time", help="HH:MM-HH:MM 直接指定時段（任意插時，不需 slot 別名）")
     asd.add_argument("--start", help="start_date YYYY-MM-DD")
     asd.add_argument("--day", help="單 day（mon|tue|...）")
     asd.add_argument("--days", help="多 day（逗號分隔）")
@@ -445,6 +636,29 @@ def build_parser():
     asd.add_argument("--lessons", type=int, help="total_lessons")
     asd.add_argument("--note")
     asd.add_argument("--apply", action="store_true")
+
+    ss = sub.add_parser("split-schedule", help="切某條 schedule（過去不動 + 改未來）")
+    ss.add_argument("--schedule-id", help="目標 schedule id（例 SCH-005）")
+    ss.add_argument("--class", dest="class_id", help="或指定 class（自動找該 class 唯一的 day/days schedule）")
+    ss.add_argument("--at", required=True, help="從哪天開始改 YYYY-MM-DD（這天起算後段）")
+    ss.add_argument("--day", help="後段 single day（不寫則沿用前段）")
+    ss.add_argument("--days", help="後段 multi days（逗號分隔）")
+    ss.add_argument("--to-slot", help="後段 slot 別名（不寫則沿用前段）")
+    ss.add_argument("--to-time", help="後段時段 HH:MM-HH:MM（不寫則沿用前段）")
+    ss.add_argument("--weeks", type=int, help="後段 duration_weeks")
+    ss.add_argument("--end", help="後段 end_date YYYY-MM-DD")
+    ss.add_argument("--lessons", type=int, help="後段 total_lessons")
+    ss.add_argument("--note", help="後段備註（例「開學換時段」）")
+    ss.add_argument("--apply", action="store_true")
+
+    ml = sub.add_parser("move-lesson", help="挪一堂課（補課/改時段）")
+    ml.add_argument("--class", dest="class_id", required=True)
+    ml.add_argument("--from-date", required=True, help="原本上課日 YYYY-MM-DD")
+    ml.add_argument("--to-date", required=True, help="改到哪天 YYYY-MM-DD")
+    ml.add_argument("--to-slot", help="改用哪個 slot（不變就不寫）")
+    ml.add_argument("--to-time", help="改成什麼時段（不變就不寫）")
+    ml.add_argument("--note", help="備註（例如「7/20 颱風停課改補」）")
+    ml.add_argument("--apply", action="store_true")
 
     rs = sub.add_parser("remove-schedule", help="刪 schedule（按 class + 可選 slot/day）")
     rs.add_argument("--class", dest="class_id", required=True)
@@ -469,6 +683,8 @@ def main():
         "remove-class": cmd_remove_class,
         "add-schedule": cmd_add_schedule,
         "remove-schedule": cmd_remove_schedule,
+        "move-lesson": cmd_move_lesson,
+        "split-schedule": cmd_split_schedule,
     }
     dispatch[args.cmd](args)
 

@@ -163,9 +163,13 @@ def render_month(data, year, month):
     html.append(f'<h2>📊 {year} 年 {month} 月統計</h2>')
     html.append(f'<div class="stat-total">總堂數：<strong>{total}</strong> 堂</div>')
     html.append('<table class="calendar"><thead><tr><th>時段</th><th>堂數</th></tr></thead><tbody>')
-    for sid in sorted(slot_count.keys()):
+    # 按 slot 起始時間排（不是字串排序，避免 S10 排在 S3 前）
+    def _slot_time_key(sid):
+        t = slots_by_id.get(sid, {}).get("time", "99:99-99:99")
+        return t.split("-")[0].strip()
+    for sid in sorted(slot_count.keys(), key=_slot_time_key):
         slot = slots_by_id.get(sid, {})
-        html.append(f'<tr><td>{sid} {slot.get("time","?")} {slot.get("note","")}</td><td>{slot_count[sid]}</td></tr>')
+        html.append(f'<tr><td>{slot.get("time","?")} {slot.get("note","")}（{sid}）</td><td>{slot_count[sid]}</td></tr>')
     html.append('</tbody></table>')
     html.append('<table class="calendar"><thead><tr><th>學員</th><th>堂數</th></tr></thead><tbody>')
     for cname in sorted(class_count.keys()):
@@ -533,9 +537,13 @@ def render_summary(data):
 
     slot_count = Counter(l["slot_id"] for l in all_lessons)
     html.append('<table class="calendar"><thead><tr><th>時段</th><th>堂數</th></tr></thead><tbody>')
-    for sid, count in sorted(slot_count.items()):
+    def _slot_time_key(sid):
+        t = slots_by_id.get(sid, {}).get("time", "99:99-99:99")
+        return t.split("-")[0].strip()
+    for sid in sorted(slot_count.keys(), key=_slot_time_key):
+        count = slot_count[sid]
         slot = slots_by_id.get(sid, {})
-        html.append(f'<tr><td>{sid} {slot.get("time", "?")} {slot.get("note", "")}</td><td>{count}</td></tr>')
+        html.append(f'<tr><td>{slot.get("time", "?")} {slot.get("note", "")}（{sid}）</td><td>{count}</td></tr>')
     html.append('</tbody></table>')
     html.append('</div>')
 

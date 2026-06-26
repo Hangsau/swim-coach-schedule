@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 slots:
 - id: S3
   time: 09:00-10:00
@@ -69,18 +69,24 @@ classes:
   level: 待確認
   note: 每週四代課
 schedules:
-- class_id: STU-01
+- id: SCH-001
+  class_id: STU-01
+  slot_id: S3
+  time: 09:00-10:00
   day: wed
-  slot_id: S3
   start_date: 2026-07-03
   duration_weeks: 8
-- class_id: STU-01
+- id: SCH-002
+  class_id: STU-01
+  slot_id: S3
+  time: 09:00-10:00
   day: fri
-  slot_id: S3
   start_date: 2026-07-03
   duration_weeks: 8
-- class_id: STU-02
+- id: SCH-003
+  class_id: STU-02
   slot_id: S3
+  time: 09:00-10:00
   specific_dates:
   - 2026-07-07
   - 2026-07-21
@@ -89,66 +95,82 @@ schedules:
   - 2026-08-18
   - 2026-08-25
   note: 長頸鹿（復興）指定 6 個日期 9:00-10:00
-- class_id: STU-03
+- id: SCH-004
+  class_id: STU-03
+  slot_id: S4
+  time: 10:10-11:10
   day: mon
-  slot_id: S4
   start_date: 2026-07-02
   duration_weeks: 12
-- class_id: STU-03
+- id: SCH-005
+  class_id: STU-03
+  slot_id: S4
+  time: 10:10-11:10
   day: thu
-  slot_id: S4
   start_date: 2026-07-02
   duration_weeks: 12
-- class_id: STU-04
+- id: SCH-006
+  class_id: STU-04
+  slot_id: S5
+  time: 13:00-14:00
   days:
   - mon
   - tue
   - wed
-  slot_id: S5
   start_date: 2026-07-01
   total_lessons: 20
   note: 7/1 開始，每週一二三，排到 20 堂結束
-- class_id: STU-05
+- id: SCH-007
+  class_id: STU-05
+  slot_id: S6
+  time: 14:10-15:10
   days:
   - mon
   - thu
-  slot_id: S6
   start_date: 2026-07-06
   total_lessons: 16
   end_date: 2026-08-31
   note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
-- class_id: STU-06
+- id: SCH-008
+  class_id: STU-06
+  slot_id: S7
+  time: 15:20-16:20
   days:
   - mon
   - tue
   - wed
   - thu
   - fri
-  slot_id: S7
   start_date: 2026-07-20
   end_date: 2026-08-31
   note: 7/20 開始，每週一到五，到 8/31 暑假結束
-- class_id: STU-07
+- id: SCH-009
+  class_id: STU-07
+  slot_id: S8
+  time: 17:00-18:00
   days:
   - thu
-  slot_id: S8
   start_date: 2026-07-06
   end_date: 2026-08-31
   note: 每週四代課
-- class_id: STU-08
+- id: SCH-010
+  class_id: STU-08
+  slot_id: S9
+  time: 19:00-20:00
   days:
   - mon
   - tue
   - wed
   - thu
   - fri
-  slot_id: S9
   start_date: 2026-07-06
   end_date: 2026-08-31
-- class_id: STU-09
+- id: SCH-011
+  class_id: STU-09
+  slot_id: S10
+  time: 20:10-21:10
   days:
   - thu
-  slot_id: S10
   start_date: 2026-07-06
   end_date: 2026-08-31
   note: 每週四代課

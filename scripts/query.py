@@ -38,92 +38,95 @@ def _to_date(d):
     return datetime.strptime(str(d), "%Y-%m-%d").date()
 
 
+def _resolve_time(s, slot):
+    """schedule.time 優先（凍結值）；無則查 slot.time（當下定義）"""
+    if s.get("time"):
+        return s["time"]
+    return slot.get("time", "?")
+
+
+def _except_set(s):
+    """schedule.except_dates 排除清單（move-lesson 用）"""
+    raw = s.get("except_dates") or []
+    out = set()
+    for d in raw:
+        try:
+            out.add(_to_date(d))
+        except Exception:
+            pass
+    return out
+
+
 def expand_schedule(schedules, slots_by_id, classes_by_id):
     """展開 schedule → 具體日期清單
 
-    兩種模式：
+    模式：
       - specific_dates: 直接展開成給定清單（一次性的課）
-      - day + start_date + duration_weeks: 自動展開每週那個 day 的課
+      - day + start_date + duration_weeks/end_date: 每週固定那天
+      - days + start_date + total_lessons/end_date/duration_weeks: 多日固定
+
+    schedule 可帶：
+      - time（凍結時段，例如 "15:00-16:00"，優先於 slot.time）
+      - except_dates（排除清單，move-lesson 用）
     """
     expanded = []
     for s in schedules:
-        slot = slots_by_id.get(s["slot_id"], {})
+        slot = slots_by_id.get(s.get("slot_id"), {}) if s.get("slot_id") else {}
         cls = classes_by_id.get(s["class_id"], {})
+        slot_time = _resolve_time(s, slot)
+        slot_note = slot.get("note", "")
+        except_dates = _except_set(s)
+
+        def _emit(current, day_label):
+            if current in except_dates:
+                return False
+            expanded.append({
+                "date": current,
+                "day": day_label,
+                "slot_id": s.get("slot_id"),
+                "slot_time": slot_time,
+                "slot_note": slot_note,
+                "class_id": s["class_id"],
+                "class_name": cls.get("name", "?"),
+                "level": cls.get("level", ""),
+                "note": s.get("note", ""),
+                "schedule_id": s.get("id"),
+            })
+            return True
 
         if "specific_dates" in s:
-            # 一次性指定日期
             for ds in s["specific_dates"]:
                 current = _to_date(ds)
-                expanded.append({
-                    "date": current,
-                    "day": DAY_NAMES[current.weekday()],
-                    "slot_id": s["slot_id"],
-                    "slot_time": slot.get("time", "?"),
-                    "slot_note": slot.get("note", ""),
-                    "class_id": s["class_id"],
-                    "class_name": cls.get("name", "?"),
-                    "level": cls.get("level", ""),
-                    "note": s.get("note", ""),
-                })
-        else:
-            # 模式 A：每週固定（day + duration_weeks / end_date）
-            if "day" in s:
-                start = _to_date(s["start_date"])
-                if "end_date" in s:
-                    end = _to_date(s["end_date"]) + timedelta(days=1)
-                else:
-                    end = start + timedelta(weeks=s["duration_weeks"])
-                target_day = DAY_NAMES.index(s["day"])
-                days_ahead = (target_day - start.weekday()) % 7
-                first_date = start + timedelta(days=days_ahead)
-                current = first_date
-                while current < end:
-                    expanded.append({
-                        "date": current,
-                        "day": s["day"],
-                        "slot_id": s["slot_id"],
-                        "slot_time": slot.get("time", "?"),
-                        "slot_note": slot.get("note", ""),
-                        "class_id": s["class_id"],
-                        "class_name": cls.get("name", "?"),
-                        "level": cls.get("level", ""),
-                        "note": s.get("note", ""),
-                    })
-                    current += timedelta(days=7)
-            # 模式 B：多日 + 跑到 N 堂（days + total_lessons）
-            elif "days" in s:
-                # 模式 C：多日 + 跑到 N 堂（days + total_lessons）
-                # 模式 D：多日 + 跑到 end_date
-                start = _to_date(s["start_date"])
-                target_day_set = set(DAY_NAMES.index(d) for d in s["days"])
-                if "end_date" in s:
-                    end = _to_date(s["end_date"]) + timedelta(days=1)
-                    use_end = True
-                elif "duration_weeks" in s:
-                    end = start + timedelta(weeks=s["duration_weeks"])
-                    use_end = False
-                else:
-                    end = start + timedelta(weeks=12)  # 預設 12 週
-                    use_end = False
-                max_lessons = s.get("total_lessons", 99999)  # 預設無限
-                current = start
-                count = 0
-                while current < end and count < max_lessons:
-                    if current.weekday() in target_day_set:
-                        actual_day = DAY_NAMES[current.weekday()]
-                        expanded.append({
-                            "date": current,
-                            "day": actual_day,
-                            "slot_id": s["slot_id"],
-                            "slot_time": slot.get("time", "?"),
-                            "slot_note": slot.get("note", ""),
-                            "class_id": s["class_id"],
-                            "class_name": cls.get("name", "?"),
-                            "level": cls.get("level", ""),
-                            "note": s.get("note", ""),
-                        })
+                _emit(current, DAY_NAMES[current.weekday()])
+        elif "day" in s:
+            start = _to_date(s["start_date"])
+            if "end_date" in s:
+                end = _to_date(s["end_date"]) + timedelta(days=1)
+            else:
+                end = start + timedelta(weeks=s["duration_weeks"])
+            target_day = DAY_NAMES.index(s["day"])
+            days_ahead = (target_day - start.weekday()) % 7
+            current = start + timedelta(days=days_ahead)
+            while current < end:
+                _emit(current, s["day"])
+                current += timedelta(days=7)
+        elif "days" in s:
+            start = _to_date(s["start_date"])
+            target_day_set = set(DAY_NAMES.index(d) for d in s["days"])
+            if "end_date" in s:
+                end = _to_date(s["end_date"]) + timedelta(days=1)
+            elif "duration_weeks" in s:
+                end = start + timedelta(weeks=s["duration_weeks"])
+            else:
+                end = start + timedelta(weeks=12)
+            max_lessons = s.get("total_lessons", 99999)
+            current = start
+            count = 0
+            while current < end and count < max_lessons:
+                if current.weekday() in target_day_set:
+                    if _emit(current, DAY_NAMES[current.weekday()]):
                         count += 1
-                    current += timedelta(days=1)
+                current += timedelta(days=1)
     return expanded
 
 
