@@ -1,97 +1,26 @@
-# 游泳教練課表 — 範例
-
-# === 時段定義（每天有哪些時段可選）===
-slots:
-  - id: early-morning
-    time: "06:30-07:30"
-    note: 晨泳
-  - id: morning-1
-    time: "07:30-08:30"
-    note: 上班前
-  - id: morning-2
-    time: "09:00-10:00"
-  - id: late-morning
-    time: "10:30-11:30"
-  - id: afternoon
-    time: "14:00-15:00"
-  - id: late-afternoon
-    time: "16:00-17:00"
-  - id: evening
-    time: "17:30-18:30"
-    note: 放學後
-  - id: night
-    time: "19:00-20:00"
-    note: 成人班
-
-# === 班級 / 學員 ===
-classes:
-  - id: C01
-    name: 小明（7 歲，初學）
-    weekly_count: 2
-    level: 初級
-  - id: C02
-    name: 小華（8 歲，中級）
-    weekly_count: 2
-    level: 中級
-  - id: C03
-    name: 成人 A 班（週三晚上）
-    weekly_count: 1
-    level: 成人初學
-  - id: C04
-    name: 暑期密集班
-    weekly_count: 5
-    level: 進階
-
-# === 排定的課（哪個班 → 哪天 → 哪個時段 → 持續幾週）===
-schedules:
-  - class_id: C01
-    day: tue
-    slot_id: morning-2
-    start_date: 2026-07-01
-    duration_weeks: 12
-    note: 小明家長固定週二早上
-  - class_id: C01
-    day: thu
-    slot_id: morning-2
-    start_date: 2026-07-01
-    duration_weeks: 12
-  - class_id: C02
-    day: mon
-    slot_id: late-afternoon
-    start_date: 2026-07-01
-    duration_weeks: 12
-  - class_id: C02
-    day: wed
-    slot_id: late-afternoon
-    start_date: 2026-07-01
-    duration_weeks: 12
-  - class_id: C03
-    day: wed
-    slot_id: night
-    start_date: 2026-07-01
-    duration_weeks: 8
-  - class_id: C04
-    day: mon
-    slot_id: morning-1
-    start_date: 2026-07-13
-    duration_weeks: 4
-  - class_id: C04
-    day: tue
-    slot_id: morning-1
-    start_date: 2026-07-13
-    duration_weeks: 4
-  - class_id: C04
-    day: wed
-    slot_id: morning-1
-    start_date: 2026-07-13
-    duration_weeks: 4
-  - class_id: C04
-    day: thu
-    slot_id: morning-1
-    start_date: 2026-07-13
-    duration_weeks: 4
-  - class_id: C04
-    day: fri
-    slot_id: morning-1
-    start_date: 2026-07-13
-    duration_weeks: 4
+# 游泳教練課表 — 資料檔
+# ===========================================
+# 填法：
+#   slots:     一天有哪些時段（每個時段一個 entry）
+#   classes:   你有哪些學員 / 班級
+#   schedules: 每個班的排課（哪一天、哪個時段、開始日期、持續幾週）
+#
+# 範例（取消註解當起點）：
+#   slots:
+#     - id: morning
+#       time: "09:00-10:00"
+#   classes:
+#     - id: C01
+#       name: 學員名字
+#       weekly_count: 2
+#       level: 初級
+#   schedules:
+#     - class_id: C01
+#       day: tue
+#       slot_id: morning
+#       start_date: 2026-07-01
+#       duration_weeks: 12
+# ===========================================
+slots: []
+classes: []
+schedules: []
