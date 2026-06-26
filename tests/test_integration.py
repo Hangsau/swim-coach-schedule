@@ -65,6 +65,31 @@ def test_no_class_double_booking():
     print(f"✓ 沒有同班同時段重複衝突")
 
 
+def test_all_references_valid():
+    """所有 schedule 引用都有效（slot_id 和 class_id 都存在）"""
+    data = load()
+    slot_ids = {s['id'] for s in data.get('slots', [])}
+    class_ids = {c['id'] for c in data.get('classes', [])}
+
+    invalid_slot = []
+    invalid_class = []
+    for s in data.get('schedules', []):
+        if s.get('slot_id') not in slot_ids:
+            invalid_slot.append(s)
+        if s.get('class_id') not in class_ids:
+            invalid_class.append(s)
+
+    if invalid_slot:
+        for s in invalid_slot:
+            print(f"  ✗ slot_id 找不到: {s}")
+        assert False, f"{len(invalid_slot)} 個 schedule 引用不存在的 slot_id"
+    if invalid_class:
+        for s in invalid_class:
+            print(f"  ✗ class_id 找不到: {s}")
+        assert False, f"{len(invalid_class)} 個 schedule 引用不存在的 class_id"
+    print(f"✓ 所有 {len(data.get('schedules', []))} 個 schedule 引用都有效")
+
+
 def test_html_contains_all_class_names():
     """每個班的名字至少出現在某個 HTML 一次"""
     data = load()
@@ -92,6 +117,7 @@ if __name__ == "__main__":
     test_all_schedules_have_lessons()
     test_all_classes_have_lessons()
     test_no_class_double_booking()
+    test_all_references_valid()
     print("\n--- HTML 內容檢查 ---")
     test_html_contains_all_class_names()
     print("\n✓ 全部通過")
