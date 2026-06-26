@@ -17,6 +17,12 @@ slots:
 - id: S8
   time: 17:00-18:00
   note: 下午 5 點
+- id: S9
+  time: 18:30-19:30
+  note: 傍晚 6 點半
+- id: S10
+  time: 19:00-20:00
+  note: 晚上 7 點
 - id: S11
   time: 20:10-21:10
   note: 晚上 8 點 10
