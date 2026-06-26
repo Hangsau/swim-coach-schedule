@@ -174,7 +174,7 @@ def render_month(data, year, month):
     html.append('</aside>')
 
     html.append('<footer>')
-    html.append(f'<p>更新時間：{datetime.now().strftime("%Y-%m-%d %H:%M")}</p>')
+    html.append(f'<p>更新時間：{datetime.now().strftime("%Y-%m-%d")}</p>')
     html.append('</footer>')
     html.append('</body></html>')
 
@@ -442,7 +442,7 @@ def render_index(data, available_months):
     html.append('</div>')
 
     html.append('</main>')
-    html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d %H:%M")}</p></footer>')
+    html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d")}</p></footer>')
     html.append('</body></html>')
     return "\n".join(html)
 
@@ -540,7 +540,7 @@ def render_summary(data):
     html.append('</div>')
 
     html.append('</main>')
-    html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d %H:%M")}</p></footer>')
+    html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d")}</p></footer>')
     html.append('</body></html>')
     return "\n".join(html)
 
@@ -651,7 +651,7 @@ def render_grid(data, year, month):
 
     html.append('</tbody></table></div>')
     html.append('</main>')
-    html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d %H:%M")}</p></footer>')
+    html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d")}</p></footer>')
     html.append('</body></html>')
     return "\n".join(html)
 

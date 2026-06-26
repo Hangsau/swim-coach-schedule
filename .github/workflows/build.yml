@@ -1,0 +1,63 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # 防止 bot 自身 push 觸發循環
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: pip install pyyaml pytest
+
+      - name: Validate yaml (strict)
+        run: python scripts/validate.py --strict
+
+      - name: Run tests
+        run: python -m pytest tests/ -v
+
+      - name: Rebuild docs
+        run: python scripts/render_html.py
+
+      - name: PR drift check (read-only)
+        if: github.event_name == 'pull_request'
+        run: |
+          if ! git diff --quiet docs/; then
+            echo "::error::docs/ 跟 yaml drift；本地跑 python scripts/render_html.py 後 commit 再 push"
+            git diff --stat docs/
+            exit 1
+          fi
+
+      - name: Auto-commit drifted docs (main push only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          if ! git diff --quiet docs/; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/
+            git commit -m "ci: auto-rebuild docs"
+            git push
+          else
+            echo "docs/ 跟 yaml 一致，無需重 commit"
+          fi
