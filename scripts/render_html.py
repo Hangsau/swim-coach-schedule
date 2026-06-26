@@ -790,6 +790,12 @@ def main():
             month_path.write_text(month_html, encoding="utf-8")
             print(f"  ✓ {y}-{m:02d}.html ({len(month_html)} chars)")
 
+            # grid view
+            grid_html = render_grid(data, y, m)
+            grid_path = docs_dir / f"grid-{y}-{m:02d}.html"
+            grid_path.write_text(grid_html, encoding="utf-8")
+            print(f"  ✓ grid-{y}-{m:02d}.html ({len(grid_html)} chars)")
+
         # index.html
         index_html = render_index(data, months)
         out = Path(args.out)
