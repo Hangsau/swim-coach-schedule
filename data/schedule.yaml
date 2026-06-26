@@ -1,172 +1,198 @@
+# 游泳教練課表 — 資料檔
+# ===========================================
+# 填法：
+#   slots:     一天有哪些時段（每個時段一個 entry）
+#   classes:   你有哪些學員 / 班級
+#   schedules: 每個班的排課（哪一天、哪個時段、開始日期、持續幾週）
+# ===========================================
+
+# 時段
 slots:
-- id: S3
-  time: 09:00-10:00
-  note: 早上 9 點
-- id: S4
-  time: 10:10-11:10
-  note: 早上 10 點
-- id: S5
-  time: 13:00-14:00
-  note: 下午 1 點
-- id: S6
-  time: 14:10-15:10
-  note: 下午 2 點
-- id: S7
-  time: 15:20-16:20
-  note: 下午 3 點 20
-- id: S8
-  time: 17:00-18:00
-  note: 下午 5 點
-- id: S9
-  time: 19:00-20:00
-  note: 晚上 7 點
-- id: S10
-  time: 20:10-21:10
-  note: 晚上 8 點 10
-- id: S11
-  time: 20:10-21:10
-  note: 晚上 8 點 10
+  - id: S3
+    time: "09:00-10:00"
+    note: 早上 9 點
+  - id: S4
+    time: "10:10-11:10"
+    note: 早上 10 點
+  - id: S5
+    time: "13:00-14:00"
+    note: 下午 1 點
+  - id: S6
+    time: "14:10-15:10"
+    note: 下午 2 點
+  - id: S7
+    time: "15:20-16:20"
+    note: 下午 3 點 20
+  - id: S8
+    time: "17:00-18:00"
+    note: 下午 5 點
+  - id: S9
+    time: "19:00-20:00"
+    note: 晚上 7 點
+  - id: S10
+    time: "20:10-21:10"
+    note: 晚上 8 點 10
+  - id: S11
+    time: "18:30-19:30"
+    note: 傍晚 6 點半
+
+# 班級 / 學員
 classes:
-- id: STU-01
-  name: 學員-待確認（吉德堡 或 歐森，待你確認）
-  weekly_count: 2
-  level: 待確認
-  note: 用戶 2026-06-26 提供：「名字之後再確認」
-- id: STU-02
-  name: 長頸鹿（復興）
-  weekly_count: 1
-  level: 待確認
-  note: 地點：復興
-- id: STU-03
-  name: 長頸鹿（塗城）
-  weekly_count: 2
-  level: 待確認
-  note: 地點：塗城
-- id: STU-04
-  name: 乖乖
-  weekly_count: 3
-  level: 待確認
-- id: STU-05
-  name: 英特兒
-  weekly_count: 2
-  level: 待確認
-- id: STU-06
-  name: 精緻班
-  weekly_count: 5
-  level: 待確認
-  note: 7/20 開始
-- id: STU-07
-  name: 代課（17:00-18:00）
-  weekly_count: 1
-  level: 待確認
-  note: 每週四代課
-- id: STU-09
-  name: 代課（20:10-21:10）
-  weekly_count: 1
-  level: 待確認
-  note: 時段其實是 S11（不是 S9）
-- id: STU-10
-  name: 代課（20:10-21:10）
-  weekly_count: 1
-  level: 待確認
-  note: 「S10 20:10-21:10 7/6 開始 每週四 代課」user 2026-06-26
+  - id: STU-01
+    name: 學員-待確認（吉德堡 或 歐森，待你確認）
+    weekly_count: 2
+    level: 待確認
+    note: 用戶 2026-06-26 提供：「名字之後再確認」
+
+  - id: STU-02
+    name: 長頸鹿（復興）
+    weekly_count: 1
+    level: 待確認
+    note: 地點：復興
+
+  - id: STU-03
+    name: 長頸鹿（塗城）
+    weekly_count: 2
+    level: 待確認
+    note: 地點：塗城
+
+  - id: STU-04
+    name: 乖乖
+    weekly_count: 3
+    level: 待確認
+
+  - id: STU-05
+    name: 英特兒
+    weekly_count: 2
+    level: 待確認
+
+  - id: STU-06
+    name: 精緻班
+    weekly_count: 5
+    level: 待確認
+    note: 7/20 開始
+
+  - id: STU-07
+    name: 代課（17:00-18:00）
+    weekly_count: 1
+    level: 待確認
+    note: 每週四代課
+
+  - id: STU-08
+    name: 晚間班
+    weekly_count: 5
+    level: 待確認
+    note: 沒指定名稱，每週一到五
+
+  - id: STU-09
+    name: 代課（20:10-21:10）
+    weekly_count: 1
+    level: 待確認
+    note: 每週四代課
+
+  - id: STU-10
+    name: 個別班
+    weekly_count: 5
+    level: 待確認
+    note: 一對一 / 小班
+
+# 排定的課
 schedules:
-- class_id: STU-01
-  day: wed
-  slot_id: S3
-  start_date: 2026-07-03
-  duration_weeks: 8
-  note: 每週三 9:00-10:00
-- class_id: STU-01
-  day: fri
-  slot_id: S3
-  start_date: 2026-07-03
-  duration_weeks: 8
-  note: 每週五 9:00-10:00
-- class_id: STU-02
-  slot_id: S3
-  specific_dates:
-  - 2026-07-07
-  - 2026-07-21
-  - 2026-07-28
-  - 2026-08-04
-  - 2026-08-18
-  - 2026-08-25
-  note: 長頸鹿（復興）指定 6 個日期 9:00-10:00
-- class_id: STU-03
-  day: mon
-  slot_id: S4
-  start_date: 2026-07-02
-  duration_weeks: 12
-  note: 每週一 10:10-11:10
-- class_id: STU-03
-  day: thu
-  slot_id: S4
-  start_date: 2026-07-02
-  duration_weeks: 12
-  note: 每週四 10:10-11:10
-- class_id: STU-04
-  days:
-  - mon
-  - tue
-  - wed
-  slot_id: S5
-  start_date: 2026-07-01
-  total_lessons: 20
-  note: 7/1 開始，每週一二三，排到 20 堂結束
-- class_id: STU-05
-  days:
-  - mon
-  - thu
-  slot_id: S6
-  start_date: 2026-07-06
-  total_lessons: 16
-  end_date: 2026-08-31
-  note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
-- class_id: STU-06
-  days:
-  - mon
-  - tue
-  - wed
-  - thu
-  - fri
-  slot_id: S7
-  start_date: 2026-07-20
-  end_date: 2026-08-31
-  note: 7/20 開始，每週一到五，到 8/31 暑假結束
-- class_id: STU-07
-  days:
-  - thu
-  slot_id: S8
-  start_date: 2026-07-06
-  end_date: 2026-08-31
-  note: 每週四代課
-- class_id: STU-09
-  days:
-  - thu
-  slot_id: S11
-  start_date: 2026-07-06
-  end_date: 2026-08-31
-  note: 每週四代課
-- class_id: STU-09
-  days:
-  - mon
-  - tue
-  - wed
-  - thu
-  - fri
-  slot_id: S9
-  start_date: '2026-07-06'
-  end_date: '2026-08-31'
-  note: 每週一到五 7/6 起
-- class_id: STU-10
-  days:
-  - thu
-  slot_id: S10
-  start_date: '2026-07-06'
-  end_date: '2026-08-31'
-  note: 每週四代課
-reserved:
-- id: R1
-  time: 18:00-19:00
-  note: 已有課（user 2026-06-26 告知）
+  # 學員-待確認：每週三、五，從 7/3 起 8 週 = 16 堂
+  - class_id: STU-01
+    day: wed
+    slot_id: S3
+    start_date: 2026-07-03
+    duration_weeks: 8
+    note: 每週三 9:00-10:00
+
+  - class_id: STU-01
+    day: fri
+    slot_id: S3
+    start_date: 2026-07-03
+    duration_weeks: 8
+    note: 每週五 9:00-10:00
+
+  # 長頸鹿（復興）：指定 6 個日期
+  - class_id: STU-02
+    slot_id: S3
+    specific_dates:
+      - 2026-07-07
+      - 2026-07-21
+      - 2026-07-28
+      - 2026-08-04
+      - 2026-08-18
+      - 2026-08-25
+    note: 長頸鹿（復興）指定 6 個日期 9:00-10:00
+
+  # 長頸鹿（塗城）：每週一、四，從 7/2 起 12 週 = 24 堂
+  - class_id: STU-03
+    day: mon
+    slot_id: S4
+    start_date: 2026-07-02
+    duration_weeks: 12
+    note: 每週一 10:10-11:10
+
+  - class_id: STU-03
+    day: thu
+    slot_id: S4
+    start_date: 2026-07-02
+    duration_weeks: 12
+    note: 每週四 10:10-11:10
+
+  # 乖乖：每週一、二、三，從 7/1 起，排到 20 堂就停
+  - class_id: STU-04
+    days: [mon, tue, wed]
+    slot_id: S5
+    start_date: 2026-07-01
+    total_lessons: 20
+    note: 7/1 開始，每週一二三，排到 20 堂結束
+
+  # 英特兒：每週一、四，從 7/6 起，排到 16 堂就停（= 8 週）
+  - class_id: STU-05
+    days: [mon, thu]
+    slot_id: S6
+    start_date: 2026-07-06
+    total_lessons: 16
+    end_date: 2026-08-31
+    note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
+
+  # 精緻班：每週一到五，從 7/20 起
+  - class_id: STU-06
+    days: [mon, tue, wed, thu, fri]
+    slot_id: S7
+    start_date: 2026-07-20
+    end_date: 2026-08-31
+    note: 7/20 開始，每週一到五，到 8/31 暑假結束
+
+  # 代課（17:00-18:00）：每週四，從 7/6 起
+  - class_id: STU-07
+    days: [thu]
+    slot_id: S8
+    start_date: 2026-07-06
+    end_date: 2026-08-31
+    note: 每週四代課
+
+  # 晚間班：每週一到五，從 7/6 起
+  - class_id: STU-08
+    days: [mon, tue, wed, thu, fri]
+    slot_id: S9
+    start_date: 2026-07-06
+    end_date: 2026-08-31
+    note: 每週一到五
+
+  # 代課（20:10-21:10）：每週四，從 7/6 起
+  - class_id: STU-09
+    days: [thu]
+    slot_id: S10
+    start_date: 2026-07-06
+    end_date: 2026-08-31
+    note: 每週四代課
+
+  # 個別班：每週一到五，從 7/6 起 3 週（15 堂），S11 18:30-19:30
+  - class_id: STU-10
+    days: [mon, tue, wed, thu, fri]
+    slot_id: S11
+    start_date: 2026-07-06
+    duration_weeks: 3
+    note: 個別班（user 2026-06-26 提供）
