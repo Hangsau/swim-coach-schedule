@@ -13,6 +13,13 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+# Windows console（cp950）print ✓ 會 crash，強制 UTF-8
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 ROOT = Path(__file__).parent.parent
 DATA = ROOT / "data" / "schedule.yaml"
 
@@ -606,8 +613,7 @@ def render_grid(data, year, month):
         ny, nm = year + 1, 1
     else:
         ny, nm = year, month + 1
-    from pathlib import Path as P
-    docs_dir = P("/home/hangsau/projects/swim-coach-schedule/docs")
+    docs_dir = ROOT / "docs"
     if (docs_dir / f"grid-{py}-{pm:02d}.html").exists():
         html.append(f'<a href="grid-{py}-{pm:02d}.html">← 上一月</a>')
     html.append(f'<a href="{year}-{month:02d}.html">→ 月曆</a>')
