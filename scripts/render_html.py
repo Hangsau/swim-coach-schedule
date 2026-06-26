@@ -457,6 +457,78 @@ def collect_months_with_data(data):
     return sorted(months)
 
 
+def render_summary(data):
+    """渲染學員總表頁面"""
+    from collections import Counter
+
+    slots_by_id = {s["id"]: s for s in data.get("slots", [])}
+    classes_by_id = {c["id"]: c for c in data.get("classes", [])}
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+
+    html = ['<!DOCTYPE html>',
+            '<html lang="zh-TW">',
+            '<head>',
+            '<meta charset="UTF-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+            '<title>學員總表 — 游泳教練課表</title>',
+            '<style>',
+            CSS,
+            '</style>',
+            '</head>',
+            '<body>',
+            '<header>',
+            '<h1>📋 學員總表</h1>',
+            '<div class="month-nav">',
+            '<a href="index.html">← 回首頁</a>',
+            '<span class="current">學員總覽</span>',
+            '</div>',
+            '</header>',
+            '<main>',
+    ]
+
+    total = 0
+    for cls_id in classes_by_id:
+        cls = classes_by_id[cls_id]
+        lessons = sorted([l for l in all_lessons if l["class_id"] == cls_id], key=lambda x: x["date"])
+        if not lessons:
+            continue
+        slot = slots_by_id.get(lessons[0]["slot_id"], {})
+        days_count = Counter(l["day"] for l in lessons)
+        days_str = "、".join(f"{DAY_NAMES_ZH[d]}{c}" for d, c in sorted(days_count.items()))
+
+        html.append('<div class="summary-block">')
+        html.append(f'<h2>{cls["name"]} <span class="count">{len(lessons)} 堂</span></h2>')
+        html.append('<div class="meta">')
+        html.append(f'<span>時段：{slot.get("time", "?")}</span>')
+        html.append(f'<span>每週：{days_str}</span>')
+        html.append(f'<span>開始：{lessons[0]["date"]}（{DAY_NAMES_ZH[lessons[0]["day"]]}）</span>')
+        html.append(f'<span>結束：{lessons[-1]["date"]}（{DAY_NAMES_ZH[lessons[-1]["day"]]}）</span>')
+        html.append('</div>')
+        html.append('<table class="calendar"><thead><tr><th>#</th><th>日期</th><th>星期</th></tr></thead><tbody>')
+        for i, l in enumerate(lessons, 1):
+            html.append(f'<tr><td>{i}</td><td>{l["date"]}</td><td>{DAY_NAMES_ZH[l["day"]]}</td></tr>')
+        html.append('</tbody></table>')
+        html.append('</div>')
+
+        total += len(lessons)
+
+    html.append('<div class="summary-block total">')
+    html.append(f'<h2>總計 {total} 堂</h2>')
+
+    slot_count = Counter(l["slot_id"] for l in all_lessons)
+    html.append('<table class="calendar"><thead><tr><th>時段</th><th>堂數</th></tr></thead><tbody>')
+    for sid, count in sorted(slot_count.items()):
+        slot = slots_by_id.get(sid, {})
+        html.append(f'<tr><td>{sid} {slot.get("time", "?")} {slot.get("note", "")}</td><td>{count}</td></tr>')
+    html.append('</tbody></table>')
+    html.append('</div>')
+
+    html.append('</main>')
+    html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d %H:%M")}</p></footer>')
+    html.append('</body></html>')
+    return "\n".join(html)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--out", default=str(ROOT / "docs" / "index.html"))
