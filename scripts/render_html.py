@@ -152,10 +152,14 @@ def render_month(data, year, month):
         next_year, next_month = year + 1, 1
     else:
         next_year, next_month = year, month + 1
-    html.append(f'<a href="{prev_year}-{prev_month:02d}.html">← 上一月</a>')
+    if (prev_year, prev_month) in available_months:
+        html.append(f'<a href="{prev_year}-{prev_month:02d}.html">← 上一月</a>')
     html.append('<a href="index.html">全部</a>')
     html.append(f'<span class="current">{year} 年 {month} 月</span>')
-    html.append(f'<a href="{next_year}-{next_month:02d}.html">下一月 →</a>')
+    if (next_year, next_month) in available_months:
+        html.append(f'<a href="{next_year}-{next_month:02d}.html">下一月 →</a>')
+    html.append(f'<a href="grid-{year}-{month:02d}.html">↳ grid</a>')
+    html.append('<a href="summary.html">學員總表</a>')
     html.append('</div>')
     html.append('</header>')
     html.append('<main>')
@@ -538,6 +542,8 @@ def render_summary(data):
             '<div class="month-nav">',
             '<a href="index.html">← 回首頁</a>',
             '<span class="current">學員總覽</span>',
+            '<a href="2026-07.html">→ 月曆（7 月）</a>',
+            '<a href="grid-2026-07.html">→ grid（7 月）</a>',
             '</div>',
             '</header>',
             '<main>',
@@ -645,7 +651,7 @@ def render_grid(data, year, month):
             '<a href="index.html">← 回首頁</a>',
             f'<span class="current">{year} 年 {month} 月</span>',
     ]
-    # 上一月 / 下一月
+    # 上一月 / 下一月（邊界檢查）
     if month == 1:
         py, pm = year - 1, 12
     else:
@@ -654,8 +660,14 @@ def render_grid(data, year, month):
         ny, nm = year + 1, 1
     else:
         ny, nm = year, month + 1
-    html.append(f'<a href="grid-{py}-{pm:02d}.html">← 上一月</a>')
-    html.append(f'<a href="grid-{ny}-{nm:02d}.html">下一月 →</a>')
+    from pathlib import Path as P
+    docs_dir = P("/home/hangsau/projects/swim-coach-schedule/docs")
+    if (docs_dir / f"grid-{py}-{pm:02d}.html").exists():
+        html.append(f'<a href="grid-{py}-{pm:02d}.html">← 上一月</a>')
+    html.append(f'<a href="{year}-{month:02d}.html">→ 月曆</a>')
+    if (docs_dir / f"grid-{ny}-{nm:02d}.html").exists():
+        html.append(f'<a href="grid-{ny}-{nm:02d}.html">下一月 →</a>')
+    html.append('<a href="summary.html">學員總表</a>')
     html.append('</div></header>')
     html.append('<main>')
 
