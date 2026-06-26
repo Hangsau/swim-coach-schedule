@@ -152,11 +152,16 @@ def render_month(data, year, month):
         next_year, next_month = year + 1, 1
     else:
         next_year, next_month = year, month + 1
-    if (prev_year, prev_month) in available_months:
+    # 算 available_months（這個 render 範圍內所有 schedule 涵蓋的月）
+    _available = set()
+    for _l in all_lessons:
+        _available.add((_l['date'].year, _l['date'].month))
+    _available.add((year, month))  # 至少自己
+    if (prev_year, prev_month) in _available:
         html.append(f'<a href="{prev_year}-{prev_month:02d}.html">← 上一月</a>')
     html.append('<a href="index.html">全部</a>')
     html.append(f'<span class="current">{year} 年 {month} 月</span>')
-    if (next_year, next_month) in available_months:
+    if (next_year, next_month) in _available:
         html.append(f'<a href="{next_year}-{next_month:02d}.html">下一月 →</a>')
     html.append(f'<a href="grid-{year}-{month:02d}.html">↳ grid</a>')
     html.append('<a href="summary.html">學員總表</a>')
