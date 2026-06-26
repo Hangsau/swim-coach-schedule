@@ -100,9 +100,9 @@ def render_month(data, year, month):
             '<header>',
             f'<h1>🏊 課表</h1>',
             f'<div class="month-nav">',
-            f'<a href="?month={year}-{month-1:02d}">← 上一月</a>',
+            f'<a href="index.html">← 全部月份</a>',
             f'<span class="current">{year} 年 {month} 月</span>',
-            f'<a href="?month={year}-{month+1:02d}">下一月 →</a>',
+            f'<a href="{year}-{month+1:02d}.html">下一月 →</a>',
             '</div>',
             '</header>',
             '<main>',
@@ -238,6 +238,33 @@ footer {
   color: #888;
   font-size: 13px;
 }
+main h2 {
+  margin-top: 30px;
+  margin-bottom: 12px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+table.calendar th, table.calendar td { padding: 8px; vertical-align: top; }
+table.calendar th { background: var(--accent); color: white; }
+.month-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.month-link a {
+  display: block;
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: center;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: bold;
+}
+.month-link a:hover { background: var(--accent); color: white; }
 @media (max-width: 768px) {
   body { padding: 10px; }
   table.calendar th, table.calendar td { padding: 4px; height: 80px; }
@@ -249,27 +276,124 @@ footer {
 """
 
 
+def render_index(data, available_months):
+    """渲染首頁：列出所有月份 + 從今天起的課程列表"""
+    slots_by_id = {s["id"]: s for s in data.get("slots", [])}
+    classes_by_id = {c["id"]: c for c in data.get("classes", [])}
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+
+    today = date.today()
+    future_lessons = [l for l in all_lessons if l["date"] >= today]
+    future_lessons.sort(key=lambda l: (l["date"], l["slot_time"]))
+
+    links = []
+    for y, m in available_months:
+        links.append(f'<a href="{y}-{m:02d}.html">{y} 年 {m} 月</a>')
+
+    html = ['<!DOCTYPE html>',
+            '<html lang="zh-TW">',
+            '<head>',
+            '<meta charset="UTF-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+            '<title>游泳教練課表</title>',
+            '<style>',
+            CSS,
+            '</style>',
+            '</head>',
+            '<body>',
+            '<header>',
+            '<h1>🏊 課表</h1>',
+            '<div class="month-nav">',
+    ]
+    html.append('<span class="current">全部月份</span>')
+    html.append('</div></header>')
+    html.append('<main>')
+
+    if future_lessons:
+        html.append('<h2>從今天起的課程</h2>')
+        html.append('<table class="calendar"><thead><tr><th>日期</th><th>時間</th><th>學員</th><th>備註</th></tr></thead><tbody>')
+        current_date = None
+        for l in future_lessons:
+            html.append('<tr>')
+            html.append(f'<td>{l["date"]} ({DAY_NAMES_ZH[l["day"]]})</td>')
+            html.append(f'<td>{l["slot_time"]}</td>')
+            html.append(f'<td>{l["class_name"]}</td>')
+            html.append(f'<td>{l["note"]}</td>')
+            html.append('</tr>')
+        html.append('</tbody></table>')
+    else:
+        html.append('<p style="text-align:center;color:#888;padding:40px;">目前沒有安排課程</p>')
+
+    html.append('<h2>月曆 view</h2>')
+    html.append('<div class="month-list">')
+    for link in links:
+        html.append(f'<div class="month-link">{link}</div>')
+    html.append('</div>')
+
+    html.append('</main>')
+    html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d %H:%M")}</p></footer>')
+    html.append('</body></html>')
+    return "\n".join(html)
+
+
+def collect_months_with_data(data):
+    """找出 schedule 涵蓋的所有月份"""
+    slots_by_id = {s["id"]: s for s in data.get("slots", [])}
+    classes_by_id = {c["id"]: c for c in data.get("classes", [])}
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+
+    months = set()
+    for l in all_lessons:
+        months.add((l["date"].year, l["date"].month))
+    # 加上當月 + 上下月
+    today = date.today()
+    for offset in [-1, 0, 1]:
+        m = today.month + offset
+        y = today.year
+        if m < 1:
+            m = 12 + m
+            y -= 1
+        elif m > 12:
+            m = m - 12
+            y += 1
+        months.add((y, m))
+    return sorted(months)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--out", default=str(ROOT / "docs" / "index.html"))
-    p.add_argument("--month", help="YYYY-MM 格式")
+    p.add_argument("--month", help="YYYY-MM 格式（單月）")
     args = p.parse_args()
 
     data = load()
+    months = collect_months_with_data(data)
 
     if args.month:
         year, month = map(int, args.month.split("-"))
+        html = render_month(data, year, month)
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(html, encoding="utf-8")
+        print(f"✓ 渲染完成：{out}（{len(html)} chars）")
+        print(f"  月份：{year}-{month:02d}")
     else:
-        today = date.today()
-        year, month = today.year, today.month
+        # 渲染 index（首頁 + 所有月份連結）
+        docs_dir = Path(args.out).parent
 
-    html = render_month(data, year, month)
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(html, encoding="utf-8")
-    print(f"✓ 渲染完成：{out}（{len(html)} chars）")
-    print(f"  月份：{year}-{month:02d}")
-    print(f"  查看：file://{out.absolute()}")
+        # 每個月單獨 HTML
+        for y, m in months:
+            month_html = render_month(data, y, m)
+            month_path = docs_dir / f"{y}-{m:02d}.html"
+            month_path.write_text(month_html, encoding="utf-8")
+            print(f"  ✓ {y}-{m:02d}.html ({len(month_html)} chars)")
+
+        # index.html
+        index_html = render_index(data, months)
+        out = Path(args.out)
+        out.write_text(index_html, encoding="utf-8")
+        print(f"\n✓ index.html ({len(index_html)} chars)")
+        print(f"  共 {len(months)} 個月")
 
 
 if __name__ == "__main__":

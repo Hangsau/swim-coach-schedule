@@ -4,23 +4,34 @@
 #   slots:     一天有哪些時段（每個時段一個 entry）
 #   classes:   你有哪些學員 / 班級
 #   schedules: 每個班的排課（哪一天、哪個時段、開始日期、持續幾週）
-#
-# 範例（取消註解當起點）：
-#   slots:
-#     - id: morning
-#       time: "09:00-10:00"
-#   classes:
-#     - id: C01
-#       name: 學員名字
-#       weekly_count: 2
-#       level: 初級
-#   schedules:
-#     - class_id: C01
-#       day: tue
-#       slot_id: morning
-#       start_date: 2026-07-01
-#       duration_weeks: 12
 # ===========================================
-slots: []
-classes: []
-schedules: []
+
+# 時段
+slots:
+  - id: S3
+    time: "09:00-10:00"
+    note: 早上 9 點
+
+# 班級 / 學員
+classes:
+  - id: STU-01
+    name: 學員-待確認（吉德堡 或 歐森，待你確認）
+    weekly_count: 2
+    level: 待確認
+    note: 用戶 2026-06-26 提供：「名字之後再確認」
+
+# 排定的課
+schedules:
+  - class_id: STU-01
+    day: wed
+    slot_id: S3
+    start_date: 2026-06-26
+    duration_weeks: 8
+    note: 每週三 9:00-10:00，共 16 堂中的 8 堂
+
+  - class_id: STU-01
+    day: fri
+    slot_id: S3
+    start_date: 2026-06-26
+    duration_weeks: 8
+    note: 每週五 9:00-10:00，共 16 堂中的 8 堂
