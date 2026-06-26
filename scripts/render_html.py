@@ -141,11 +141,23 @@ def render_month(data, year, month):
             '<header>',
             f'<h1>🏊 課表</h1>',
             f'<div class="month-nav">',
-            f'<a href="index.html">← 全部月份</a>',
-            f'<span class="current">{year} 年 {month} 月</span>',
-            f'<a href="{year}-{month+1:02d}.html">下一月 →</a>',
-            '</div>',
-            '</header>',
+    ]
+    # 上一月（跨年處理）
+    if month == 1:
+        prev_year, prev_month = year - 1, 12
+    else:
+        prev_year, prev_month = year, month - 1
+    # 下一月（跨年處理）
+    if month == 12:
+        next_year, next_month = year + 1, 1
+    else:
+        next_year, next_month = year, month + 1
+    html.append(f'<a href="{prev_year}-{prev_month:02d}.html">← 上一月</a>')
+    html.append('<a href="index.html">全部</a>')
+    html.append(f'<span class="current">{year} 年 {month} 月</span>')
+    html.append(f'<a href="{next_year}-{next_month:02d}.html">下一月 →</a>')
+    html.append('</div>')
+    html.append('</header>')
             '<main>',
             '<table class="calendar">',
             '<thead><tr>',
