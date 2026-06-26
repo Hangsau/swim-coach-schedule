@@ -65,6 +65,26 @@ def test_no_class_double_booking():
     print(f"✓ 沒有同班同時段重複衝突")
 
 
+def test_no_slot_double_booking():
+    """沒有「跨班同時段」（同日同時段只能有一堂 — 因為你只有一個人一池）"""
+    data = load()
+    slots_by_id = {s['id']: s for s in data.get('slots', [])}
+    classes_by_id = {c['id']: c for c in data.get('classes', [])}
+    all_lessons = expand_schedule(data.get('schedules', []), slots_by_id, classes_by_id)
+
+    by_date_slot = defaultdict(list)
+    for l in all_lessons:
+        key = (l['date'], l['slot_id'])
+        by_date_slot[key].append(l)
+
+    conflicts = [(k, lst) for k, lst in by_date_slot.items() if len(lst) > 1]
+    if conflicts:
+        for (d, sid), lst in conflicts:
+            print(f"  ✗ {d} {sid}: {len(lst)} 堂 → {[f\"{l['class_id']}({l['class_name']})\" for l in lst]}")
+        assert False, f"發現 {len(conflicts)} 個同日同時段跨班衝突（你只有一個人，泳池同時間只能一班）"
+    print(f"✓ 沒有同日同時段跨班衝突")
+
+
 def test_all_references_valid():
     """所有 schedule 引用都有效（slot_id 和 class_id 都存在）"""
     data = load()
@@ -117,6 +137,7 @@ if __name__ == "__main__":
     test_all_schedules_have_lessons()
     test_all_classes_have_lessons()
     test_no_class_double_booking()
+    test_no_slot_double_booking()
     test_all_references_valid()
     print("\n--- HTML 內容檢查 ---")
     test_html_contains_all_class_names()
