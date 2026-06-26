@@ -153,14 +153,14 @@ schedules:
   - wed
   - thu
   - fri
-  slot_id: S_temp_10
+  slot_id: S10
   start_date: 2026-07-06
   end_date: 2026-08-31
   note: 每週一到五
 - class_id: STU-09
   days:
   - thu
-  slot_id: S_temp_11
+  slot_id: S11
   start_date: 2026-07-06
   end_date: 2026-08-31
   note: 每週四代課
