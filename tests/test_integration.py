@@ -5,10 +5,12 @@ test_integration.py — render 整合測試
 1. 每一個 schedule 都有對應的 lessons 被 render 出來
 2. 每個班總堂數 > 0
 3. 沒有空 grid（每班每月至少有一堂）
+4. 沒有時段重複（同一班同時段不會出現兩次）
 """
 import sys
 import re
 from pathlib import Path
+from collections import defaultdict
 
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -43,6 +45,26 @@ def test_all_classes_have_lessons():
     print(f"✓ 所有 {len(data.get('classes', []))} 個 class 都有課")
 
 
+def test_no_class_double_booking():
+    """沒有「同班同時段重複」（同班同日同時段只允許一堂）"""
+    data = load()
+    slots_by_id = {s['id']: s for s in data.get('slots', [])}
+    classes_by_id = {c['id']: c for c in data.get('classes', [])}
+    all_lessons = expand_schedule(data.get('schedules', []), slots_by_id, classes_by_id)
+
+    by_class_date_slot = defaultdict(list)
+    for l in all_lessons:
+        key = (l['class_id'], l['date'], l['slot_id'])
+        by_class_date_slot[key].append(l)
+
+    conflicts = [(k, lst) for k, lst in by_class_date_slot.items() if len(lst) > 1]
+    if conflicts:
+        for (cid, d, sid), lst in conflicts:
+            print(f"  ✗ {cid} {d} {sid}: 出現 {len(lst)} 次 → {[l['class_name'] for l in lst]}")
+        assert False, f"發現 {len(conflicts)} 個同班同時段重複衝突"
+    print(f"✓ 沒有同班同時段重複衝突")
+
+
 def test_html_contains_all_class_names():
     """每個班的名字至少出現在某個 HTML 一次"""
     data = load()
@@ -51,7 +73,6 @@ def test_html_contains_all_class_names():
     all_lessons = expand_schedule(data.get('schedules', []), slots_by_id, classes_by_id)
     docs_dir = ROOT / "docs"
 
-    # 所有 HTML 內容（拼起來）
     all_content = ""
     for f in docs_dir.glob("*.html"):
         all_content += f.read_text(encoding="utf-8")
@@ -70,6 +91,7 @@ if __name__ == "__main__":
     print("=" * 50)
     test_all_schedules_have_lessons()
     test_all_classes_have_lessons()
+    test_no_class_double_booking()
     print("\n--- HTML 內容檢查 ---")
     test_html_contains_all_class_names()
     print("\n✓ 全部通過")
