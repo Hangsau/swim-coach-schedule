@@ -42,27 +42,43 @@ def load():
 def expand_schedule(schedules, slots_by_id, classes_by_id):
     expanded = []
     for s in schedules:
-        start = _to_date(s["start_date"])
-        end = start + timedelta(weeks=s["duration_weeks"])
         slot = slots_by_id.get(s["slot_id"], {})
         cls = classes_by_id.get(s["class_id"], {})
-        target_day = DAY_NAMES.index(s["day"])
-        days_ahead = (target_day - start.weekday()) % 7
-        first_date = start + timedelta(days=days_ahead)
-        current = first_date
-        while current < end:
-            expanded.append({
-                "date": current,
-                "day": s["day"],
-                "slot_id": s["slot_id"],
-                "slot_time": slot.get("time", "?"),
-                "slot_note": slot.get("note", ""),
-                "class_id": s["class_id"],
-                "class_name": cls.get("name", "?"),
-                "level": cls.get("level", ""),
-                "note": s.get("note", ""),
-            })
-            current += timedelta(days=7)
+
+        if "specific_dates" in s:
+            for ds in s["specific_dates"]:
+                current = _to_date(ds)
+                expanded.append({
+                    "date": current,
+                    "day": DAY_NAMES[current.weekday()],
+                    "slot_id": s["slot_id"],
+                    "slot_time": slot.get("time", "?"),
+                    "slot_note": slot.get("note", ""),
+                    "class_id": s["class_id"],
+                    "class_name": cls.get("name", "?"),
+                    "level": cls.get("level", ""),
+                    "note": s.get("note", ""),
+                })
+        else:
+            start = _to_date(s["start_date"])
+            end = start + timedelta(weeks=s["duration_weeks"])
+            target_day = DAY_NAMES.index(s["day"])
+            days_ahead = (target_day - start.weekday()) % 7
+            first_date = start + timedelta(days=days_ahead)
+            current = first_date
+            while current < end:
+                expanded.append({
+                    "date": current,
+                    "day": s["day"],
+                    "slot_id": s["slot_id"],
+                    "slot_time": slot.get("time", "?"),
+                    "slot_note": slot.get("note", ""),
+                    "class_id": s["class_id"],
+                    "class_name": cls.get("name", "?"),
+                    "level": cls.get("level", ""),
+                    "note": s.get("note", ""),
+                })
+                current += timedelta(days=7)
     return expanded
 
 
