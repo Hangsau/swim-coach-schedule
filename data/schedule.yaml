@@ -54,20 +54,20 @@ classes:
   level: 待確認
   note: 7/20 開始
 - id: STU-07
-  name: 代課（17:00-18:00）
+  name: 精緻班初級班代課
   weekly_count: 1
   level: 待確認
-  note: 每週四代課
+  note: 每週四代課 17:00-18:00
 - id: STU-08
-  name: 晚間班
+  name: 短訓班
   weekly_count: 5
   level: 待確認
-  note: 沒指定名稱，每週一到五
+  note: 每週一到五 19:00-20:00
 - id: STU-09
-  name: 代課（20:10-21:10）
+  name: 精緻班初級班代課
   weekly_count: 1
   level: 待確認
-  note: 每週四代課
+  note: 每週四代課 20:10-21:10
 schedules:
 - id: SCH-001
   class_id: STU-01
@@ -101,14 +101,14 @@ schedules:
   time: 10:10-11:10
   day: mon
   start_date: 2026-07-02
-  duration_weeks: 12
+  end_date: 2026-08-30
 - id: SCH-005
   class_id: STU-03
   slot_id: S4
   time: 10:10-11:10
   day: thu
   start_date: 2026-07-02
-  duration_weeks: 12
+  end_date: 2026-08-30
 - id: SCH-006
   class_id: STU-04
   slot_id: S5
@@ -142,7 +142,7 @@ schedules:
   - thu
   - fri
   start_date: 2026-07-20
-  end_date: 2026-08-31
+  end_date: 2026-08-30
   note: 7/20 開始，每週一到五，到 8/31 暑假結束
 - id: SCH-009
   class_id: STU-07
@@ -164,7 +164,7 @@ schedules:
   - thu
   - fri
   start_date: 2026-07-06
-  end_date: 2026-08-31
+  end_date: 2026-08-30
 - id: SCH-011
   class_id: STU-09
   slot_id: S10
