@@ -100,16 +100,17 @@ schedules:
   slot_id: S4
   time: 10:10-11:10
   day: mon
-  start_date: '2026-07-09'
+  start_date: '2026-07-02'
   end_date: 2026-08-30
-  note: 7/9 開始（原本 7/2 取消第一堂），
+  note: ''
 - id: SCH-005
   class_id: STU-03
   slot_id: S4
   time: 10:10-11:10
   day: thu
-  start_date: 2026-07-02
+  start_date: '2026-07-09'
   end_date: 2026-08-30
+  note: ''
 - id: SCH-006
   class_id: STU-04
   slot_id: S5
