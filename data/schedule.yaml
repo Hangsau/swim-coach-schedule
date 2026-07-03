@@ -48,11 +48,6 @@ classes:
   name: 英特兒
   weekly_count: 2
   level: 待確認
-- id: STU-06
-  name: 精緻班
-  weekly_count: 5
-  level: 待確認
-  note: 7/20 開始
 - id: STU-07
   name: 精緻班初級班代課
   weekly_count: 1
@@ -133,19 +128,6 @@ schedules:
   total_lessons: 16
   end_date: 2026-08-31
   note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
-- id: SCH-008
-  class_id: STU-06
-  slot_id: S7
-  time: 15:20-16:20
-  days:
-  - mon
-  - tue
-  - wed
-  - thu
-  - fri
-  start_date: 2026-07-20
-  end_date: 2026-08-30
-  note: 7/20 開始，每週一到五，到 8/31 暑假結束
 - id: SCH-009
   class_id: STU-07
   slot_id: S8
