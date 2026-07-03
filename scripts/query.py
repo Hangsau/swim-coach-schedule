@@ -100,26 +100,37 @@ def expand_schedule(schedules, slots_by_id, classes_by_id):
                 _emit(current, DAY_NAMES[current.weekday()])
         elif "day" in s:
             start = _to_date(s["start_date"])
-            if "end_date" in s:
-                end = _to_date(s["end_date"]) + timedelta(days=1)
-            else:
-                end = start + timedelta(weeks=s["duration_weeks"])
-            target_day = DAY_NAMES.index(s["day"])
-            days_ahead = (target_day - start.weekday()) % 7
-            current = start + timedelta(days=days_ahead)
-            while current < end:
-                _emit(current, s["day"])
-                current += timedelta(days=7)
-        elif "days" in s:
-            start = _to_date(s["start_date"])
-            target_day_set = set(DAY_NAMES.index(d) for d in s["days"])
+            max_lessons = s.get("total_lessons", 99999)
             if "end_date" in s:
                 end = _to_date(s["end_date"]) + timedelta(days=1)
             elif "duration_weeks" in s:
                 end = start + timedelta(weeks=s["duration_weeks"])
+            elif "total_lessons" in s:
+                # 只給堂數：展開範圍由 max_lessons 收斂，+52 週緩衝 except_dates
+                end = start + timedelta(weeks=max_lessons + 52)
             else:
                 end = start + timedelta(weeks=12)
+            target_day = DAY_NAMES.index(s["day"])
+            days_ahead = (target_day - start.weekday()) % 7
+            current = start + timedelta(days=days_ahead)
+            count = 0
+            while current < end and count < max_lessons:
+                if _emit(current, s["day"]):
+                    count += 1
+                current += timedelta(days=7)
+        elif "days" in s:
+            start = _to_date(s["start_date"])
+            target_day_set = set(DAY_NAMES.index(d) for d in s["days"])
             max_lessons = s.get("total_lessons", 99999)
+            if "end_date" in s:
+                end = _to_date(s["end_date"]) + timedelta(days=1)
+            elif "duration_weeks" in s:
+                end = start + timedelta(weeks=s["duration_weeks"])
+            elif "total_lessons" in s:
+                # 只給堂數：展開範圍由 max_lessons 收斂，+52 週緩衝 except_dates
+                end = start + timedelta(weeks=max_lessons + 52)
+            else:
+                end = start + timedelta(weeks=12)
             current = start
             count = 0
             while current < end and count < max_lessons:

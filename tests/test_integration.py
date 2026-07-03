@@ -75,6 +75,31 @@ def test_duration_weeks_respected():
     print(f"✓ 所有 days + duration_weeks 模式都跑正確的週數")
 
 
+def test_single_day_total_lessons_expands():
+    """回歸：day（單數）+ total_lessons（無 end_date/duration_weeks）要展開成剛好 N 堂
+
+    原本 day 分支只認 end_date/duration_weeks，缺兩者時直接 KeyError('duration_weeks')。
+    """
+    slots = {'S3': {'id': 'S3', 'time': '09:00-10:00', 'note': ''}}
+    classes = {'C1': {'id': 'C1', 'name': '兒童', 'level': ''}}
+    sched = [{'id': 'X1', 'class_id': 'C1', 'slot_id': 'S3',
+              'start_date': '2026-07-11', 'day': 'sat', 'total_lessons': 10}]
+    lessons = expand_schedule(sched, slots, classes)
+    assert len(lessons) == 10, f"day+total_lessons 應展開 10 堂，實際 {len(lessons)}"
+    assert lessons[0]['date'].isoformat() == '2026-07-11'
+    assert lessons[-1]['date'].isoformat() == '2026-09-12'  # 第 10 個週六
+
+
+def test_multi_days_total_lessons_only_expands():
+    """days（複數）+ total_lessons（無 end/weeks）不被 default 12 週截斷，展開剛好 N 堂"""
+    slots = {'S7': {'id': 'S7', 'time': '15:20-16:20', 'note': ''}}
+    classes = {'C2': {'id': 'C2', 'name': '成人', 'level': ''}}
+    sched = [{'id': 'X2', 'class_id': 'C2', 'slot_id': 'S7',
+              'start_date': '2026-07-10', 'days': ['mon', 'fri'], 'total_lessons': 30}]
+    lessons = expand_schedule(sched, slots, classes)
+    assert len(lessons) == 30, f"days+total_lessons(30) 應展開 30 堂，實際 {len(lessons)}"
+
+
 def test_no_class_double_booking():
     """沒有「同班同時段重複」（同班同日同時段只允許一堂）"""
     data = load()
