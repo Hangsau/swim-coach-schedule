@@ -379,6 +379,75 @@ table.calendar th { background: var(--accent); color: white; }
   text-align: left;
 }
 .summary-block table th { background: #f5f5f5; font-weight: bold; }
+/* ---- 首頁：快速導航 + 接下來 7 天 + 收合完整清單 ---- */
+.quick-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.quick-nav a {
+  flex: 1 1 130px;
+  text-align: center;
+  padding: 16px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 16px;
+  background: white;
+}
+.quick-nav a.primary {
+  flex: 2 1 200px;
+  background: var(--accent);
+  color: white;
+}
+.quick-nav a:hover { background: var(--accent); color: white; }
+.upcoming { margin-bottom: 8px; }
+.day-group {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.day-head {
+  background: #f0f4f8;
+  padding: 8px 14px;
+  font-weight: bold;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+}
+.day-head .wd { color: #888; font-weight: normal; font-size: 13px; margin-left: 8px; }
+.up-lesson {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f2f2f2;
+}
+.up-lesson:last-child { border-bottom: none; }
+.up-time { font-weight: bold; color: var(--accent); font-size: 15px; min-width: 100px; }
+.up-name { font-size: 16px; }
+.up-note { color: #888; font-size: 13px; }
+details.full-list {
+  margin-top: 24px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+details.full-list summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  font-weight: bold;
+  color: var(--accent);
+  font-size: 15px;
+}
+details.full-list[open] summary { border-bottom: 1px solid var(--border); }
+details.full-list table.calendar { border: none; box-shadow: none; }
 @media (max-width: 768px) {
   body { padding: 10px; }
   table.calendar th, table.calendar td { padding: 4px; height: 80px; }
@@ -386,12 +455,14 @@ table.calendar th { background: var(--accent); color: white; }
   table.calendar td .lesson { font-size: 10px; padding: 2px 4px; }
   h1 { font-size: 20px; }
   .month-nav .current { font-size: 16px; }
+  .up-time { min-width: 80px; font-size: 14px; }
+  .up-name { font-size: 15px; }
 }
 """
 
 
 def render_index(data, available_months):
-    """渲染首頁：列出所有月份 + 從今天起的課程列表"""
+    """渲染首頁：頂部快速導航 → 接下來 7 天 → 完整未來課程（收合）"""
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
     all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
@@ -400,9 +471,9 @@ def render_index(data, available_months):
     future_lessons = [l for l in all_lessons if l["date"] >= today]
     future_lessons.sort(key=lambda l: (l["date"], l["slot_time"]))
 
-    links = []
-    for y, m in available_months:
-        links.append(f'<a href="{y}-{m:02d}.html">{y} 年 {m} 月</a>')
+    cur_y, cur_m = today.year, today.month
+    week_end = today + timedelta(days=6)
+    soon_lessons = [l for l in future_lessons if l["date"] <= week_end]
 
     html = ['<!DOCTYPE html>',
             '<html lang="zh-TW">',
@@ -419,15 +490,52 @@ def render_index(data, available_months):
             '<h1>🏊 課表</h1>',
             '<div class="month-nav">',
     ]
-    html.append('<span class="current">全部月份</span>')
+    html.append('<span class="current">首頁</span>')
     html.append('</div></header>')
     html.append('<main>')
-    html.append('<main>')
 
+    # 頂部快速導航（一進來就能進月曆）
+    html.append('<nav class="quick-nav">')
+    html.append(f'<a class="primary" href="{cur_y}-{cur_m:02d}.html">📅 本月月曆</a>')
+    html.append(f'<a href="grid-{cur_y}-{cur_m:02d}.html">▦ 本月每日 grid</a>')
+    html.append('<a href="summary.html">📋 學員總表</a>')
+    html.append('</nav>')
+
+    # 各月連結
+    html.append('<div class="month-list">')
+    for y, m in available_months:
+        html.append(f'<div class="month-link"><a href="{y}-{m:02d}.html">{y} 年 {m} 月</a></div>')
+    html.append('</div>')
+
+    # 接下來 7 天
+    html.append('<h2>接下來 7 天</h2>')
+    if soon_lessons:
+        html.append('<div class="upcoming">')
+        cur = None
+        for l in soon_lessons:
+            if l["date"] != cur:
+                if cur is not None:
+                    html.append('</div>')  # 收前一天
+                cur = l["date"]
+                html.append('<div class="day-group">')
+                html.append(f'<div class="day-head">{l["date"].strftime("%m/%d")}'
+                            f'<span class="wd">{DAY_NAMES_ZH[l["day"]]}</span></div>')
+            html.append('<div class="up-lesson">')
+            html.append(f'<span class="up-time">{l["slot_time"]}</span>')
+            html.append(f'<span class="up-name">{l["class_name"]}</span>')
+            if l["note"]:
+                html.append(f'<span class="up-note">{l["note"]}</span>')
+            html.append('</div>')
+        html.append('</div>')  # 收最後一天
+        html.append('</div>')  # 收 upcoming
+    else:
+        html.append('<p style="color:#888;padding:20px;">最近 7 天沒有課</p>')
+
+    # 完整未來課程（預設收合）
     if future_lessons:
-        html.append('<h2>從今天起的課程</h2>')
+        html.append('<details class="full-list">')
+        html.append(f'<summary>完整未來課程（共 {len(future_lessons)} 堂，點開看）</summary>')
         html.append('<table class="calendar"><thead><tr><th>日期</th><th>時間</th><th>學員</th><th>備註</th></tr></thead><tbody>')
-        current_date = None
         for l in future_lessons:
             html.append('<tr>')
             html.append(f'<td>{l["date"]} ({DAY_NAMES_ZH[l["day"]]})</td>')
@@ -436,14 +544,7 @@ def render_index(data, available_months):
             html.append(f'<td>{l["note"]}</td>')
             html.append('</tr>')
         html.append('</tbody></table>')
-    else:
-        html.append('<p style="text-align:center;color:#888;padding:40px;">目前沒有安排課程</p>')
-
-    html.append('<h2>月曆 view</h2>')
-    html.append('<div class="month-list">')
-    for link in links:
-        html.append(f'<div class="month-link">{link}</div>')
-    html.append('</div>')
+        html.append('</details>')
 
     html.append('</main>')
     html.append(f'<footer><p>更新時間：{datetime.now().strftime("%Y-%m-%d")}</p></footer>')

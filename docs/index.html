@@ -199,6 +199,75 @@ table.calendar th { background: var(--accent); color: white; }
   text-align: left;
 }
 .summary-block table th { background: #f5f5f5; font-weight: bold; }
+/* ---- 首頁：快速導航 + 接下來 7 天 + 收合完整清單 ---- */
+.quick-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.quick-nav a {
+  flex: 1 1 130px;
+  text-align: center;
+  padding: 16px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 16px;
+  background: white;
+}
+.quick-nav a.primary {
+  flex: 2 1 200px;
+  background: var(--accent);
+  color: white;
+}
+.quick-nav a:hover { background: var(--accent); color: white; }
+.upcoming { margin-bottom: 8px; }
+.day-group {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.day-head {
+  background: #f0f4f8;
+  padding: 8px 14px;
+  font-weight: bold;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+}
+.day-head .wd { color: #888; font-weight: normal; font-size: 13px; margin-left: 8px; }
+.up-lesson {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f2f2f2;
+}
+.up-lesson:last-child { border-bottom: none; }
+.up-time { font-weight: bold; color: var(--accent); font-size: 15px; min-width: 100px; }
+.up-name { font-size: 16px; }
+.up-note { color: #888; font-size: 13px; }
+details.full-list {
+  margin-top: 24px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+details.full-list summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  font-weight: bold;
+  color: var(--accent);
+  font-size: 15px;
+}
+details.full-list[open] summary { border-bottom: 1px solid var(--border); }
+details.full-list table.calendar { border: none; box-shadow: none; }
 @media (max-width: 768px) {
   body { padding: 10px; }
   table.calendar th, table.calendar td { padding: 4px; height: 80px; }
@@ -206,6 +275,8 @@ table.calendar th { background: var(--accent); color: white; }
   table.calendar td .lesson { font-size: 10px; padding: 2px 4px; }
   h1 { font-size: 20px; }
   .month-nav .current { font-size: 16px; }
+  .up-time { min-width: 80px; font-size: 14px; }
+  .up-name { font-size: 15px; }
 }
 
 </style>
@@ -214,18 +285,130 @@ table.calendar th { background: var(--accent); color: white; }
 <header>
 <h1>🏊 課表</h1>
 <div class="month-nav">
-<span class="current">全部月份</span>
+<span class="current">首頁</span>
 </div></header>
 <main>
-<main>
-<h2>從今天起的課程</h2>
+<nav class="quick-nav">
+<a class="primary" href="2026-07.html">📅 本月月曆</a>
+<a href="grid-2026-07.html">▦ 本月每日 grid</a>
+<a href="summary.html">📋 學員總表</a>
+</nav>
+<div class="month-list">
+<div class="month-link"><a href="2026-06.html">2026 年 6 月</a></div>
+<div class="month-link"><a href="2026-07.html">2026 年 7 月</a></div>
+<div class="month-link"><a href="2026-08.html">2026 年 8 月</a></div>
+<div class="month-link"><a href="2026-09.html">2026 年 9 月</a></div>
+</div>
+<h2>接下來 7 天</h2>
+<div class="upcoming">
+<div class="day-group">
+<div class="day-head">07/06<span class="wd">週一</span></div>
+<div class="up-lesson">
+<span class="up-time">10:10-11:10</span>
+<span class="up-name">長頸鹿（塗城）</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">13:00-14:00</span>
+<span class="up-name">乖乖</span>
+<span class="up-note">7/6 開始（原本 7/1 取消第一堂），7/1 開始，每週一二三，排到 20 堂結束</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">14:10-15:10</span>
+<span class="up-name">英特兒</span>
+<span class="up-note">7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">19:00-20:00</span>
+<span class="up-name">短訓班</span>
+</div>
+</div>
+<div class="day-group">
+<div class="day-head">07/07<span class="wd">週二</span></div>
+<div class="up-lesson">
+<span class="up-time">09:00-10:00</span>
+<span class="up-name">長頸鹿（復興）</span>
+<span class="up-note">長頸鹿（復興）指定 6 個日期 9:00-10:00</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">13:00-14:00</span>
+<span class="up-name">乖乖</span>
+<span class="up-note">7/6 開始（原本 7/1 取消第一堂），7/1 開始，每週一二三，排到 20 堂結束</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">19:00-20:00</span>
+<span class="up-name">短訓班</span>
+</div>
+</div>
+<div class="day-group">
+<div class="day-head">07/08<span class="wd">週三</span></div>
+<div class="up-lesson">
+<span class="up-time">09:00-10:00</span>
+<span class="up-name">吉德堡</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">13:00-14:00</span>
+<span class="up-name">乖乖</span>
+<span class="up-note">7/6 開始（原本 7/1 取消第一堂），7/1 開始，每週一二三，排到 20 堂結束</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">19:00-20:00</span>
+<span class="up-name">短訓班</span>
+</div>
+</div>
+<div class="day-group">
+<div class="day-head">07/09<span class="wd">週四</span></div>
+<div class="up-lesson">
+<span class="up-time">10:10-11:10</span>
+<span class="up-name">長頸鹿（塗城）</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">14:10-15:10</span>
+<span class="up-name">英特兒</span>
+<span class="up-note">7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">17:00-18:00</span>
+<span class="up-name">精緻班初級班代課</span>
+<span class="up-note">每週四代課</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">19:00-20:00</span>
+<span class="up-name">短訓班</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">20:10-21:10</span>
+<span class="up-name">精緻班初級班代課</span>
+<span class="up-note">每週四代課</span>
+</div>
+</div>
+<div class="day-group">
+<div class="day-head">07/10<span class="wd">週五</span></div>
+<div class="up-lesson">
+<span class="up-time">09:00-10:00</span>
+<span class="up-name">吉德堡</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">15:20-16:20</span>
+<span class="up-name">精緻班(成人*1)</span>
+<span class="up-note">成人；週一五 15:20</span>
+</div>
+<div class="up-lesson">
+<span class="up-time">19:00-20:00</span>
+<span class="up-name">短訓班</span>
+</div>
+</div>
+<div class="day-group">
+<div class="day-head">07/11<span class="wd">週六</span></div>
+<div class="up-lesson">
+<span class="up-time">09:00-10:00</span>
+<span class="up-name">精緻班(兒童*4)</span>
+<span class="up-note">兒童；週六 9:00；共10堂</span>
+</div>
+</div>
+</div>
+<details class="full-list">
+<summary>完整未來課程（共 149 堂，點開看）</summary>
 <table class="calendar"><thead><tr><th>日期</th><th>時間</th><th>學員</th><th>備註</th></tr></thead><tbody>
-<tr>
-<td>2026-07-03 (週五)</td>
-<td>09:00-10:00</td>
-<td>吉德堡</td>
-<td></td>
-</tr>
 <tr>
 <td>2026-07-06 (週一)</td>
 <td>10:10-11:10</td>
@@ -1121,13 +1304,7 @@ table.calendar th { background: var(--accent); color: white; }
 <td>兒童；週六 9:00；共10堂</td>
 </tr>
 </tbody></table>
-<h2>月曆 view</h2>
-<div class="month-list">
-<div class="month-link"><a href="2026-06.html">2026 年 6 月</a></div>
-<div class="month-link"><a href="2026-07.html">2026 年 7 月</a></div>
-<div class="month-link"><a href="2026-08.html">2026 年 8 月</a></div>
-<div class="month-link"><a href="2026-09.html">2026 年 9 月</a></div>
-</div>
+</details>
 </main>
-<footer><p>更新時間：2026-07-03</p></footer>
+<footer><p>更新時間：2026-07-06</p></footer>
 </body></html>

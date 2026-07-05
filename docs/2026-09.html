@@ -199,6 +199,75 @@ table.calendar th { background: var(--accent); color: white; }
   text-align: left;
 }
 .summary-block table th { background: #f5f5f5; font-weight: bold; }
+/* ---- 首頁：快速導航 + 接下來 7 天 + 收合完整清單 ---- */
+.quick-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.quick-nav a {
+  flex: 1 1 130px;
+  text-align: center;
+  padding: 16px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 16px;
+  background: white;
+}
+.quick-nav a.primary {
+  flex: 2 1 200px;
+  background: var(--accent);
+  color: white;
+}
+.quick-nav a:hover { background: var(--accent); color: white; }
+.upcoming { margin-bottom: 8px; }
+.day-group {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.day-head {
+  background: #f0f4f8;
+  padding: 8px 14px;
+  font-weight: bold;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+}
+.day-head .wd { color: #888; font-weight: normal; font-size: 13px; margin-left: 8px; }
+.up-lesson {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f2f2f2;
+}
+.up-lesson:last-child { border-bottom: none; }
+.up-time { font-weight: bold; color: var(--accent); font-size: 15px; min-width: 100px; }
+.up-name { font-size: 16px; }
+.up-note { color: #888; font-size: 13px; }
+details.full-list {
+  margin-top: 24px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+details.full-list summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  font-weight: bold;
+  color: var(--accent);
+  font-size: 15px;
+}
+details.full-list[open] summary { border-bottom: 1px solid var(--border); }
+details.full-list table.calendar { border: none; box-shadow: none; }
 @media (max-width: 768px) {
   body { padding: 10px; }
   table.calendar th, table.calendar td { padding: 4px; height: 80px; }
@@ -206,6 +275,8 @@ table.calendar th { background: var(--accent); color: white; }
   table.calendar td .lesson { font-size: 10px; padding: 2px 4px; }
   h1 { font-size: 20px; }
   .month-nav .current { font-size: 16px; }
+  .up-time { min-width: 80px; font-size: 14px; }
+  .up-name { font-size: 15px; }
 }
 
 </style>
@@ -360,6 +431,6 @@ table.calendar th { background: var(--accent); color: white; }
 </tbody></table>
 </aside>
 <footer>
-<p>更新時間：2026-07-03</p>
+<p>更新時間：2026-07-06</p>
 </footer>
 </body></html>
