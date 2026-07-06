@@ -159,7 +159,7 @@ schedules:
   - fri
   start_date: 2026-07-06
   end_date: 2026-08-30
-  cancelled_dates:
+  except_dates:
   - 2026-07-06
   note: 7/6 取消，不補課
 - id: SCH-011
