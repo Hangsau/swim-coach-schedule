@@ -24,6 +24,9 @@ slots:
 - id: S10
   time: 20:10-21:10
   note: 晚上 8 點 10
+- id: S11
+  time: 18:00-19:00
+  note: 晚上 6 點
 classes:
 - id: STU-01
   name: 吉德堡
@@ -209,6 +212,7 @@ schedules:
   note: 兒童；週六 9:00；共10堂
 - id: SCH-015
   class_id: STU-12
+  slot_id: S11
   time: 18:00-19:00
   start_date: '2026-07-08'
   day: wed
