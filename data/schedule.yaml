@@ -174,7 +174,8 @@ schedules:
   end_date: 2026-08-30
   except_dates:
   - 2026-07-06
-  note: 7/6 取消，不補課
+  - 2026-07-07
+  note: 7/6、7/7 取消，不補課
 - id: SCH-011
   class_id: STU-09
   slot_id: S10
