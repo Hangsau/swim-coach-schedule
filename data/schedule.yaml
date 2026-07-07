@@ -73,6 +73,16 @@ classes:
   weekly_count: 1
   level: 待確認
   note: 兒童4人；7/11起週六；共10堂
+- id: STU-12
+  name: 精緻班
+  weekly_count: 1
+  level: 待確認
+  note: 每週三 18:00-19:00，7/8 起共10堂
+- id: STU-13
+  name: 精緻班
+  weekly_count: 2
+  level: 待確認
+  note: 每週一三 20:10-21:10，7/27 起共10堂
 schedules:
 - id: SCH-001
   class_id: STU-01
@@ -197,3 +207,20 @@ schedules:
   day: sat
   end_date: '2026-09-12'
   note: 兒童；週六 9:00；共10堂
+- id: SCH-015
+  class_id: STU-12
+  time: 18:00-19:00
+  start_date: '2026-07-08'
+  day: wed
+  total_lessons: 10
+  note: 7/8 起每週三，共10堂
+- id: SCH-016
+  class_id: STU-13
+  slot_id: S10
+  time: 20:10-21:10
+  start_date: '2026-07-27'
+  days:
+  - mon
+  - wed
+  total_lessons: 10
+  note: 7/27 起每週一三，共10堂
