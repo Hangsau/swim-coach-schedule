@@ -39,9 +39,11 @@ def test_all_schedules_have_lessons():
     all_lessons = expand_schedule(data.get('schedules', []), slots_by_id, classes_by_id)
 
     for s in data.get('schedules', []):
-        lessons_for_this = [l for l in all_lessons if l['class_id'] == s['class_id'] and l['slot_id'] == s['slot_id']]
+        # schedule 可以是 slot_id 引用或 time-only 自訂時段（validate.py：兩者擇一）
+        lessons_for_this = [l for l in all_lessons
+                            if l['class_id'] == s['class_id'] and l['slot_id'] == s.get('slot_id')]
         assert len(lessons_for_this) > 0, \
-            f"schedule {s['class_id']} {s['slot_id']} 沒展開任何 lessons（模式 day={s.get('day')} days={s.get('days')} total={s.get('total_lessons')}）"
+            f"schedule {s['class_id']} {s.get('slot_id') or s.get('time')} 沒展開任何 lessons（模式 day={s.get('day')} days={s.get('days')} total={s.get('total_lessons')}）"
     print(f"✓ 所有 {len(data.get('schedules', []))} 個 schedule 都有 expanded lessons")
 
 
@@ -206,7 +208,8 @@ def test_all_references_valid():
     invalid_slot = []
     invalid_class = []
     for s in data.get('schedules', []):
-        if s.get('slot_id') not in slot_ids:
+        # time-only schedule 沒有 slot_id 是合法的（validate.py：slot_id 或 time 擇一）
+        if s.get('slot_id') is not None and s['slot_id'] not in slot_ids:
             invalid_slot.append(s)
         if s.get('class_id') not in class_ids:
             invalid_class.append(s)
