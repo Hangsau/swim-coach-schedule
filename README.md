@@ -53,6 +53,23 @@ python3 scripts/query.py slot morning-1
 
 ---
 
+## 圖形介面（GUI）
+
+不想打指令的話，用 Tkinter 編輯器（Windows）：
+
+```bat
+set PYTHONIOENCODING=utf-8
+pythonw scripts\schedule_gui.py
+```
+
+- **7 個入口**：加/改/刪班級、加/刪排課、單堂調整（挪課／取消／臨時加課）、一鍵上線
+- 每個動作都是「表單 → dry-run 看 diff → 確認才寫入」，底層全部走 `schedule_cli.py`，不直接碰 YAML
+- **一鍵上線** = `git pull --ff-only` → 重建頁面 → commit → push，一兩分鐘後線上行事曆更新
+- `split-schedule` 等進階操作不在 GUI，走下方 CLI 協議
+- GUI 也可作為分頁嵌入其他 Tkinter host：`from schedule_gui import build_tab; build_tab(parent_frame)`
+
+---
+
 ## 怎麼改成你真實的課表
 
 把 `data/schedule.yaml` 改成你自己的內容：
@@ -140,6 +157,8 @@ python scripts/schedule_cli.py --json add-schedule --class STU-04 --slot S5 --da
 | `add-schedule --class (--slot\|--time) --start --(day\|days\|specific-dates) [--weeks\|--end\|--lessons] [--note]` | 新增 schedule | 是 |
 | `remove-schedule --class [--slot-id] [--day] [--all]` | 刪 schedule | 是 |
 | `move-lesson --class --from-date --to-date [--to-slot\|--to-time] [--note]` | 挪一堂課（補課） | 是 |
+| `cancel-lesson --class --date [--reason]` | 取消一堂（不補） | 是 |
+| `add-lesson --class --date (--slot\|--time) [--note]` | 臨時加一堂（單日） | 是 |
 | `split-schedule (--class\|--schedule-id) --at --(day\|days) [--to-slot\|--to-time] (--weeks\|--end\|--lessons) [--note]` | 把某 schedule 在某日切兩半，過去不動、未來改 | 是 |
 
 ### 錯誤碼處理表
