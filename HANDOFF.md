@@ -19,6 +19,7 @@
 - 一鍵上線 flow：git fetch → pull --ff-only（接住 CI bot commit；分岔就紅字停下）→ render_html → git add data docs → commit → push
 - split-schedule / .ics 匯出 / 月報表：**不在 GUI**，走 CLI 或 LLM
 - 已過 /code-audit（12 項自動修正：死碼、常數化、thread 例外防 _loading 卡死等）+ compile + hub smoke test
+- e2e 驗收（2026-07-10）：測試班 GUI 上線→CI 綠→線上頁出現→整組移除→線上頁清除，全程通過；途中修掉兩個整合測試對 time-only schedule 的硬索引 bug（ff7ac7c），並把誤入版控的 __pycache__ 清出
 - README 已加「圖形介面（GUI）」章節 + 補命令表缺漏兩列
 
 ## 已知事項 / 待辦

@@ -48,6 +48,6 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 
 1. **不可手改 `data/schedule.yaml`**：跳過 validate + diff 防呆；CI strict 會紅。一律走 CLI。
 2. **schedule 內 `time` 欄位是凍結值**：改 `slots[].time` 不影響既有 schedule（設計如此，防止改 slot 打到歷史）。
-3. **CI auto-commit**：push 後若 docs drift，bot 會補一個 commit → 本地隨即落後 remote；下次 push 前必 `fetch` + `pull --ff-only`（GUI 一鍵上線已內建）。
+3. **CI auto-commit**：push 後若 docs drift，bot 會補一個 commit → 本地隨即落後 remote；下次 push 前必 `fetch` + `pull --ff-only`（GUI 一鍵上線已內建）。drift 常見成因：render 的「更新時間 / today 高亮」依執行當地日期，本機（UTC+8）與 CI（UTC）跨日時必 drift，屬正常現象。
 4. **cp950**：所有 script 輸出含中文，subprocess / console 必 `PYTHONIOENCODING=utf-8`，GUI 內部 subprocess helper 已強制。
 5. **README 命令表 vs CLI**：2026-07-10 已補齊 13 命令；日後加子命令記得同步，權威來源是 `build_parser()`（schedule_cli.py:670）。
