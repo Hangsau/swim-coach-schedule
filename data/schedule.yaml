@@ -91,6 +91,10 @@ classes:
   weekly_count: 1
   level: 待確認
   note: 一家三口；7/17起每週五 20:10-21:10；共10堂（原7/10延後一週）
+- id: TEST-GUI
+  name: 測試班·中文名
+  weekly_count: 1
+  level: 待確認
 schedules:
 - id: SCH-001
   class_id: STU-01
