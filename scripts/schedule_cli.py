@@ -411,7 +411,7 @@ def cmd_move_lesson(args):
     # 在原 schedule 加 except_dates
     for s in new_data["schedules"]:
         if s.get("id") == src_sched_id:
-            ed = list(s.get("except_dates") or [])
+            ed = [str(x) for x in (s.get("except_dates") or [])]
             ed.append(args.from_date)
             s["except_dates"] = sorted(ed)
             break
@@ -580,8 +580,8 @@ def cmd_cancel_lesson(args):
     new_data = copy.deepcopy(data)
     for s in new_data["schedules"]:
         if s.get("id") == src_sched_id:
-            ed = list(s.get("except_dates") or [])
-            if args.date in [str(x) for x in ed]:
+            ed = [str(x) for x in (s.get("except_dates") or [])]
+            if args.date in ed:
                 emit(envelope(False,
                               errors=[_err("E_DUPLICATE_SCHEDULE",
                                            f"{args.date} 已在 except_dates 內")]),
