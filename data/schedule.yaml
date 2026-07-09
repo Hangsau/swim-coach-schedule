@@ -249,3 +249,8 @@ schedules:
   day: fri
   total_lessons: 10
   note: 一家三口；7/17起每週五，共10堂（原7/10延後一週）
+- id: SCH-018
+  class_id: TEST-GUI
+  time: 05:00-05:30
+  specific_dates:
+  - '2026-07-15'
