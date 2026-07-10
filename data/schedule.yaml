@@ -86,11 +86,6 @@ classes:
   weekly_count: 2
   level: 待確認
   note: 每週一三 20:10-21:10，7/27 起共10堂
-- id: STU-14
-  name: 精緻班(一家三口)
-  weekly_count: 1
-  level: 待確認
-  note: 一家三口；7/17起每週五 20:10-21:10；共10堂（原7/10延後一週）
 schedules:
 - id: SCH-001
   class_id: STU-01
@@ -239,14 +234,6 @@ schedules:
   - wed
   total_lessons: 10
   note: 7/27 起每週一三，共10堂
-- id: SCH-017
-  class_id: STU-14
-  slot_id: S10
-  time: 20:10-21:10
-  start_date: '2026-07-17'
-  day: fri
-  total_lessons: 10
-  note: 一家三口；7/17起每週五，共10堂（原7/10延後一週）
 - id: SCH-018
   class_id: STU-11
   specific_dates:
