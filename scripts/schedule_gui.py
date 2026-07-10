@@ -30,7 +30,7 @@ RENDER = ROOT / "scripts" / "render_html.py"
 PAGES_URL = "https://hangsau.github.io/swim-coach-schedule/"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from query import DAY_NAMES, expand_schedule, load as load_data  # noqa: E402
+from query import DAY_NAMES, DAY_NAMES_ZH, expand_schedule, load as load_data  # noqa: E402
 
 # ---- 配色：沿用桌面看板 NOC 風（與 religions-history 刊版一致；蓄意複製、不跨 repo import）----
 BG    = "#15181c"
@@ -310,6 +310,20 @@ class ConfirmDialog(tk.Toplevel):
                 summary += "（該班已無任何堂次，班級記錄一併移除）"
             tk.Label(self, text=summary, bg=BG, fg=PROG, font=F_SMALL,
                      anchor="w", wraplength=600, justify="left").pack(fill="x")
+        if "lessons_after" in resp_data:
+            summary = (f"改動後共 {resp_data['lessons_after']} 堂"
+                       f"（原 {resp_data['lessons_before']} 堂）")
+            if resp_data.get("first_lesson"):
+                summary += (f"，第一堂 {resp_data['first_lesson']}"
+                            f"、最後一堂 {resp_data['last_lesson']}")
+            tk.Label(self, text=summary, bg=BG, fg=PROG, font=F_SMALL,
+                     anchor="w", wraplength=600, justify="left").pack(fill="x")
+            lost = resp_data.get("past_lessons_lost") or 0
+            if lost:
+                tk.Label(self,
+                         text=f"⚠ 有 {lost} 堂已上過的課會因此消失，請再確認日期",
+                         bg=BG, fg=BAD, font=F_SMALL, anchor="w",
+                         wraplength=600, justify="left").pack(fill="x")
 
         for e in resp.get("errors") or []:
             tk.Label(self, text=f"錯誤 {e.get('code')}：{e.get('msg')}", bg=BG, fg=BAD,
@@ -358,6 +372,7 @@ class SwimTab(tk.Frame):
         self._classes = []
         self._slots = []
         self._all_lessons = []
+        self._schedules = []
         self._conflict_dates = set()
         self._year, self._month = t.year, t.month
 
@@ -448,12 +463,14 @@ class SwimTab(tk.Frame):
                 data = load_data()
                 slots_by_id = {s["id"]: s for s in data.get("slots") or []}
                 classes_by_id = {c["id"]: c for c in data.get("classes") or []}
+                raw_schedules = data.get("schedules") or []
                 lessons = expand_schedule(
-                    data.get("schedules") or [], slots_by_id, classes_by_id)
+                    raw_schedules, slots_by_id, classes_by_id)
                 g_dirty = run_cmd(["git", "status", "--porcelain"])
                 ahead = git_ahead()
                 self.after(0, lambda: self._render(
-                    status, classes, slots, lessons, g_dirty, ahead))
+                    status, classes, slots, lessons, g_dirty, ahead,
+                    raw_schedules))
             except Exception as ex:
                 self.after(0, lambda: self.sum_lbl.config(
                     text=f"✘ 載入失敗：{ex}", fg=BAD))
@@ -462,7 +479,8 @@ class SwimTab(tk.Frame):
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _render(self, status, classes, slots, lessons, g_dirty, ahead):
+    def _render(self, status, classes, slots, lessons, g_dirty, ahead,
+                raw_schedules=None):
         # 摘要
         up = (status.get("data") or {}).get("upcoming_7d") or []
         count = len(up)
@@ -499,6 +517,7 @@ class SwimTab(tk.Frame):
         self._classes = (classes.get("data") or {}).get("classes") or []
         self._slots = (slots.get("data") or {}).get("slots") or []
         self._all_lessons = lessons
+        self._schedules = raw_schedules or []
         self._render_calendar()
 
     def _render_calendar(self):
@@ -669,7 +688,8 @@ class SwimTab(tk.Frame):
              "hint": "這天(含)之後的課全移除，之前的保留"},
         ]
 
-    def _fields_split_schedule(self, class_value=None, at_value=None):
+    def _fields_split_schedule(self, class_value=None, at_value=None,
+                                schedule_id_value=None):
         return [
             {"flag": "--class", "label": "班級", "kind": "combo",
              "values": self._class_values(), "value": class_value, "required": True},
@@ -682,6 +702,7 @@ class SwimTab(tk.Frame):
             {"flag": "--days", "label": "改星期", "kind": "entry",
              "hint": "改星期才填：mon,tue,...（逗號分隔）；不改就留空"},
             {"flag": "--schedule-id", "label": "排課 ID", "kind": "entry",
+             "value": schedule_id_value or "",
              "hint": "這班有多條排課時才需要；先留空，錯誤訊息會列出候選"},
             {"flag": "--note", "label": "備註", "kind": "entry",
              "hint": "例：開學換時段"},
@@ -868,7 +889,7 @@ class SwimTab(tk.Frame):
             row.pack(fill="x", pady=1)
             row.bind("<Button-1>",
                      lambda ev, cc=c, p=panel: (
-                         p.destroy(), self._class_menu(ev, cc)))
+                         p.destroy(), self._class_detail(cc)))
         make_btn(panel, "關閉", panel.destroy, color=PANEL).pack(
             side="right", pady=(8, 0))
         panel.wait_visibility()
@@ -915,6 +936,210 @@ class SwimTab(tk.Frame):
             menu.tk_popup(ev.x_root, ev.y_root)
         finally:
             menu.grab_release()
+
+    # ---- 班級詳情視窗 ----
+
+    def _fields_update_schedule(self, sched):
+        """預填現有排課欄位，給 update-schedule 表單用。"""
+        days_val = ",".join(sched.get("days") or []) if sched.get("days") else ""
+        return [
+            {"flag": "--schedule-id", "label": "排課 ID", "kind": "entry",
+             "value": sched.get("id", ""), "required": True},
+            {"flag": "--start", "label": "開始日", "kind": "date",
+             "value": str(sched.get("start_date") or "")},
+            {"flag": "--end", "label": "結束日", "kind": "date",
+             "value": str(sched.get("end_date") or ""),
+             "hint": "與週數/總堂數三擇一，改別欄請清空此欄"},
+            {"flag": "--weeks", "label": "持續週數", "kind": "entry",
+             "value": str(sched.get("duration_weeks") or ""),
+             "hint": "與結束日/總堂數三擇一"},
+            {"flag": "--lessons", "label": "總堂數", "kind": "entry",
+             "value": str(sched.get("total_lessons") or "")},
+            {"flag": "--day", "label": "單一星期", "kind": "combo",
+             "values": DAY_NAMES,
+             "value": sched.get("day") or ""},
+            {"flag": "--days", "label": "多個星期", "kind": "entry",
+             "value": days_val,
+             "hint": "多個星期：mon,tue（會取代單一星期）"},
+            {"flag": "--slot", "label": "常用時段", "kind": "combo",
+             "values": self._slot_values(),
+             "hint": "換常用時段才選"},
+            {"flag": "--time", "label": "自訂時段", "kind": "entry",
+             "value": sched.get("time") or ""},
+            {"flag": "--note", "label": "備註", "kind": "entry",
+             "value": sched.get("note") or ""},
+        ]
+
+    def _schedule_menu(self, ev, c, sched, detail_win):
+        """排課條目的操作選單（在 _class_detail 內點擊觸發）。
+
+        動作前先關掉詳情視窗：寫入後 refresh 不會回填 Toplevel，留著會顯示過期資料。
+        """
+        cls_val = f"{c['id']}{SEP}{c.get('name') or ''}"
+
+        def _close_then(fn):
+            return lambda: (detail_win.destroy(), fn())
+
+        menu = tk.Menu(self, tearoff=0, bg=PANEL, fg=FG, activebackground=TRACK,
+                       activeforeground=FG, font=F_ROW)
+        menu.add_command(
+            label=f"{sched.get('id', '')}　{c.get('name', '')}", state="disabled")
+        menu.add_separator()
+        menu.add_command(
+            label="修改此排課（起始日／時段／星期／週期）",
+            command=_close_then(lambda: self._form_then_run(
+                "修改排課", "update-schedule",
+                self._fields_update_schedule(sched))))
+        menu.add_command(
+            label="從某天起換時段…",
+            command=_close_then(lambda: self._form_then_run(
+                "換時段", "split-schedule",
+                self._fields_split_schedule(
+                    class_value=cls_val,
+                    schedule_id_value=sched.get("id")))))
+        menu.add_command(
+            label="刪除此排課",
+            command=_close_then(lambda: self._form_then_run(
+                "刪除排課", "remove-schedule",
+                [{"flag": "--schedule-id", "label": "排課 ID", "kind": "entry",
+                  "value": sched.get("id", ""), "required": True}])))
+        try:
+            menu.tk_popup(ev.x_root, ev.y_root)
+        finally:
+            menu.grab_release()
+
+    def _class_detail(self, c):
+        """班級詳情視窗：顯示班級資訊 + 排課列表，底部提供班級操作按鈕。"""
+        cls_val = f"{c['id']}{SEP}{c.get('name') or ''}"
+        today_d = date.today()
+
+        win = tk.Toplevel(self)
+        win.title(f"班級詳情 — {c['id']}")
+        win.configure(bg=BG, padx=14, pady=10)
+        win.transient(self.winfo_toplevel())
+        win.resizable(True, False)
+
+        # --- 標題區 ---
+        wc = c.get("weekly_count")
+        wc_str = f"每週 {wc} 堂" if wc else ""
+        note_str = f"備註 {c.get('note')}" if c.get("note") else ""
+        subtitle = SEP.join(filter(None, [wc_str, note_str]))
+        tk.Label(win, text=f"{c['id']}　{c.get('name') or ''}",
+                 bg=BG, fg=HEAD, font=F_SEC, anchor="w").pack(fill="x", pady=(0, 2))
+        if subtitle:
+            tk.Label(win, text=subtitle, bg=BG, fg=MUTED, font=F_SMALL,
+                     anchor="w").pack(fill="x", pady=(0, 6))
+
+        # --- 排課區 ---
+        cls_scheds = [s for s in self._schedules if s.get("class_id") == c["id"]]
+        n_scheds = len(cls_scheds)
+        tk.Label(win,
+                 text=f"排課（{n_scheds} 條）　點一條開操作選單",
+                 bg=BG, fg=FG, font=(FONT, 10, "bold"), anchor="w").pack(
+            fill="x", pady=(0, 4))
+
+        if not cls_scheds:
+            tk.Label(win, text="（無排課）", bg=BG, fg=MUTED, font=F_ROW,
+                     anchor="w").pack(fill="x", padx=4, pady=2)
+        else:
+            for sched in cls_scheds:
+                # 星期描述
+                if sched.get("specific_dates"):
+                    n_dates = len(sched["specific_dates"])
+                    day_txt = f"指定日期 {n_dates} 個"
+                elif sched.get("days"):
+                    day_txt = "、".join(
+                        DAY_NAMES_ZH.get(d, d) for d in sched["days"])
+                elif sched.get("day"):
+                    day_txt = DAY_NAMES_ZH.get(sched["day"], sched["day"])
+                else:
+                    day_txt = "—"
+
+                # 時段
+                time_txt = sched.get("time") or "—"
+
+                # 起訖
+                start_txt = str(sched.get("start_date") or "—")
+                end_parts = []
+                if sched.get("end_date"):
+                    end_parts.append(f"～ {sched['end_date']}")
+                if sched.get("duration_weeks"):
+                    end_parts.append(f"（共 {sched['duration_weeks']} 週）")
+                if sched.get("total_lessons"):
+                    end_parts.append(f"（共 {sched['total_lessons']} 堂）")
+                range_txt = f"{start_txt} 起 {'　'.join(end_parts)}" if end_parts \
+                    else f"{start_txt} 起"
+
+                # 已上 / 未來
+                sched_lessons = [l for l in self._all_lessons
+                                 if l.get("schedule_id") == sched.get("id")]
+                past = [l for l in sched_lessons if l["date"] < today_d]
+                future = sorted([l for l in sched_lessons if l["date"] >= today_d],
+                                key=lambda l: l["date"])
+                counts_txt = f"已上 {len(past)}／未來 {len(future)}"
+
+                # 近 3 堂
+                near = future[:3]
+                near_txt = "近 3 堂：" + "、".join(
+                    f"{l['date'].month}/{l['date'].day}" for l in near) if near else ""
+
+                line = "　".join(filter(None, [
+                    sched.get("id", ""),
+                    day_txt,
+                    time_txt,
+                    range_txt,
+                    counts_txt,
+                    near_txt,
+                ]))
+
+                row = tk.Label(win, text=line, anchor="w", bg=PANEL, fg=FG,
+                               font=F_ROW, padx=8, pady=3, wraplength=640,
+                               justify="left")
+                row.pack(fill="x", pady=1)
+                row.bind("<Button-1>",
+                         lambda ev, s=sched: self._schedule_menu(ev, c, s, win))
+
+        # --- 底部班級操作按鈕 ---
+        sep = tk.Frame(win, bg=TRACK, height=1)
+        sep.pack(fill="x", pady=(10, 6))
+
+        btns = tk.Frame(win, bg=BG)
+        btns.pack(fill="x")
+
+        def _do_then_close(fn):
+            win.destroy()
+            fn()
+
+        make_btn(btns, "修改資料",
+                 lambda: _do_then_close(lambda: self._form_then_run(
+                     "修改班級", "update-class",
+                     self._fields_update_class(class_rec=c)))).pack(
+            side="left", padx=4)
+        make_btn(btns, "加一堂",
+                 lambda: _do_then_close(lambda: self._form_then_run(
+                     "加一堂", "add-lesson",
+                     self._fields_add_lesson(class_value=cls_val)))).pack(
+            side="left", padx=4)
+        make_btn(btns, "新增排課",
+                 lambda: _do_then_close(lambda: self._form_then_run(
+                     "新增排課", "add-schedule",
+                     self._fields_add_schedule(class_value=cls_val)))).pack(
+            side="left", padx=4)
+        make_btn(btns, "結束此班…",
+                 lambda: _do_then_close(lambda: self._form_then_run(
+                     "結束班級", "end-class",
+                     self._fields_end_class(class_value=cls_val)))).pack(
+            side="left", padx=4)
+        make_btn(btns, "刪除班級…",
+                 lambda: _do_then_close(lambda: self._form_then_run(
+                     "刪除班級", "remove-class",
+                     self._fields_remove_class(id_value=cls_val)))).pack(
+            side="left", padx=4)
+        make_btn(btns, "關閉", win.destroy, color=PANEL).pack(
+            side="right", padx=4)
+
+        win.wait_visibility()
+        win.grab_set()
 
     # ---- 頭列「更多 ▾」------
 
