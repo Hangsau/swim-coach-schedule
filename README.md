@@ -161,6 +161,7 @@ python scripts/schedule_cli.py --json add-schedule --class STU-04 --slot S5 --da
 | `update-class --id [--name] [--weekly-count] [--level] [--note]` | 改班欄位 | 是 |
 | `remove-class --id [--cascade]` | 刪班（cascade 連帶刪 schedule） | 是 |
 | `end-class --class --from` | 結束班級：from（含）之後堂次移除、之前保留；全無保留堂次時班級一併移除 | 是 |
+| `undo` | 復原上一次寫入（`data/.backup/` 最新備份；連按兩次 = 還原回去） | 是 |
 | `add-schedule --class (--slot\|--time) --start --(day\|days\|specific-dates) [--weeks\|--end\|--lessons] [--note]` | 新增 schedule | 是 |
 | `remove-schedule --class [--slot-id] [--day] [--all]` | 刪 schedule | 是 |
 | `move-lesson --class --from-date --to-date [--to-slot\|--to-time] [--note]` | 挪一堂課（補課） | 是 |

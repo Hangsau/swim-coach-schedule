@@ -13,8 +13,7 @@ schedule_cli.py — LLM-friendly CLI for swim-coach-schedule
   status / list-classes / list-slots / list-conflicts
   add-class / update-class / remove-class / end-class
   add-schedule / remove-schedule / move-lesson
-  split-schedule / cancel-lesson / add-lesson
-  preview-add-schedule
+  split-schedule / cancel-lesson / add-lesson / undo
 
 退出碼: 0=成功（含 warnings）/ 非 0=失敗
 """
@@ -87,6 +86,23 @@ def dump_yaml_text(data):
     return yaml.dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False)
 
 
+BACKUP_KEEP = 10
+
+
+def _backup_current(path):
+    """寫入前備份現行檔到同目錄 .backup/，保留最新 BACKUP_KEEP 份（undo 資料來源）。"""
+    src = Path(path)
+    if not src.exists():
+        return
+    bdir = src.parent / ".backup"
+    bdir.mkdir(exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    (bdir / f"schedule-{stamp}.yaml").write_text(
+        src.read_text(encoding="utf-8"), encoding="utf-8")
+    for old in sorted(bdir.glob("schedule-*.yaml"))[:-BACKUP_KEEP]:
+        old.unlink(missing_ok=True)
+
+
 def atomic_write(path, data, strict=False):
     """temp 寫入 + validate → 通過才 replace。回 (ok, errors, warnings, diff)"""
     text = dump_yaml_text(data)
@@ -111,6 +127,7 @@ def atomic_write(path, data, strict=False):
             tofile=str(path) + ".after",
             n=2,
         ))
+        _backup_current(path)
         tmp_path.replace(path)
         return True, [], result["warnings"], diff
     except Exception as e:
@@ -639,6 +656,20 @@ def _parse_date_safe(d):
         return None
 
 
+def cmd_undo(args):
+    """復原上一次寫入：還原 .backup/ 最新備份（再 undo 一次 = 還原回去）"""
+    backup_dir = Path(args.file).parent / ".backup"
+    baks = sorted(backup_dir.glob("schedule-*.yaml")) if backup_dir.exists() else []
+    if not baks:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID", "沒有可復原的備份（.backup/ 是空的）")]),
+             args.json)
+    latest = baks[-1]
+    new_data = load_yaml(latest)
+    _commit_or_preview(args, new_data, {"restored_from": latest.name},
+                       next_actions=["復原後再 undo 一次可還原回復原前的狀態"])
+
+
 def cmd_cancel_lesson(args):
     """取消某堂課不補：在原 schedule 加 except_dates"""
     data = load_yaml(args.file)
@@ -828,6 +859,9 @@ def build_parser():
                     help="從這天起不再上 YYYY-MM-DD")
     ec.add_argument("--apply", action="store_true")
 
+    ud = sub.add_parser("undo", help="復原上一次寫入（.backup/ 最新備份）")
+    ud.add_argument("--apply", action="store_true")
+
     cl = sub.add_parser("cancel-lesson", help="取消某堂課（不補）")
     cl.add_argument("--class", dest="class_id", required=True)
     cl.add_argument("--date", required=True, help="要取消的日期 YYYY-MM-DD")
@@ -873,6 +907,7 @@ def main():
         "update-class": cmd_update_class,
         "remove-class": cmd_remove_class,
         "end-class": cmd_end_class,
+        "undo": cmd_undo,
         "add-schedule": cmd_add_schedule,
         "remove-schedule": cmd_remove_schedule,
         "move-lesson": cmd_move_lesson,

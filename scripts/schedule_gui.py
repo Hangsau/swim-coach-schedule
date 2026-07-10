@@ -302,6 +302,14 @@ class ConfirmDialog(tk.Toplevel):
         tk.Label(self, text=f"{title}　{head}", bg=BG, fg=(DONE if ok else BAD),
                  font=F_SEC, anchor="w").pack(fill="x")
 
+        d = resp.get("data") or {}
+        if "kept_lessons" in d:
+            summary = f"保留已上 {d['kept_lessons']} 堂／移除未來 {d['removed_lessons']} 堂"
+            if d.get("class_removed"):
+                summary += "（該班已無任何堂次，班級記錄一併移除）"
+            tk.Label(self, text=summary, bg=BG, fg=PROG, font=F_SMALL,
+                     anchor="w", wraplength=600, justify="left").pack(fill="x")
+
         for e in resp.get("errors") or []:
             tk.Label(self, text=f"錯誤 {e.get('code')}：{e.get('msg')}", bg=BG, fg=BAD,
                      font=F_SMALL, anchor="w", wraplength=600, justify="left").pack(fill="x")
@@ -651,6 +659,33 @@ class SwimTab(tk.Frame):
              "value": note_val},
         ]
 
+    def _fields_end_class(self, class_value=None, from_value=None):
+        return [
+            {"flag": "--class", "label": "班級", "kind": "combo",
+             "values": self._class_values(), "value": class_value, "required": True},
+            {"flag": "--from", "label": "從這天起不再上", "kind": "date",
+             "value": from_value, "required": True,
+             "hint": "這天(含)之後的課全移除，之前的保留"},
+        ]
+
+    def _fields_split_schedule(self, class_value=None, at_value=None):
+        return [
+            {"flag": "--class", "label": "班級", "kind": "combo",
+             "values": self._class_values(), "value": class_value, "required": True},
+            {"flag": "--at", "label": "從這天起改", "kind": "date",
+             "value": at_value, "required": True, "hint": "從這天起改新時段"},
+            {"flag": "--to-slot", "label": "新時段（常用）", "kind": "combo",
+             "values": self._slot_values(), "hint": "或改填下欄"},
+            {"flag": "--to-time", "label": "新時段（自訂）", "kind": "entry",
+             "hint": "HH:MM-HH:MM"},
+            {"flag": "--days", "label": "改星期", "kind": "entry",
+             "hint": "改星期才填：mon,tue,...（逗號分隔）；不改就留空"},
+            {"flag": "--schedule-id", "label": "排課 ID", "kind": "entry",
+             "hint": "這班有多條排課時才需要；先留空，錯誤訊息會列出候選"},
+            {"flag": "--note", "label": "備註", "kind": "entry",
+             "hint": "例：開學換時段"},
+        ]
+
     def _fields_remove_class(self, id_value=""):
         return [
             {"flag": "--id", "label": "班級 ID", "kind": "combo",
@@ -736,6 +771,12 @@ class SwimTab(tk.Frame):
                                   "kind": "entry", "hint": "HH:MM-HH:MM"},
                                  {"flag": "--note", "label": "備註", "kind": "entry"},
                              ]))
+        menu.add_command(label="這班從某天起換時段…",
+                         command=lambda: self._form_then_run(
+                             "換時段", "split-schedule",
+                             self._fields_split_schedule(
+                                 class_value=cls_val,
+                                 at_value=str(lesson["date"]))))
         menu.add_command(label="這班臨時再加一堂",
                          command=lambda: self._form_then_run(
                              "加一堂", "add-lesson",
@@ -754,6 +795,12 @@ class SwimTab(tk.Frame):
                              "刪除排課", "remove-schedule",
                              self._fields_remove_schedule(
                                  class_value=cls_val, day_value=lesson["day"])))
+        menu.add_command(label="結束此班（保留已上堂次）…",
+                         command=lambda: self._form_then_run(
+                             "結束班級", "end-class",
+                             self._fields_end_class(
+                                 class_value=cls_val,
+                                 from_value=str(lesson["date"]))))
         menu.add_command(label="刪除整個班級…",
                          command=lambda: self._form_then_run(
                              "刪除班級", "remove-class",
@@ -846,11 +893,19 @@ class SwimTab(tk.Frame):
                          command=lambda: self._form_then_run(
                              "新增排課", "add-schedule",
                              self._fields_add_schedule(class_value=cls_val)))
+        menu.add_command(label="這班從某天起換時段…",
+                         command=lambda: self._form_then_run(
+                             "換時段", "split-schedule",
+                             self._fields_split_schedule(class_value=cls_val)))
         menu.add_separator()
         menu.add_command(label="刪除排課…",
                          command=lambda: self._form_then_run(
                              "刪除排課", "remove-schedule",
                              self._fields_remove_schedule(class_value=cls_val)))
+        menu.add_command(label="結束此班（保留已上堂次）…",
+                         command=lambda: self._form_then_run(
+                             "結束班級", "end-class",
+                             self._fields_end_class(class_value=cls_val)))
         menu.add_command(label="刪除整個班級…",
                          command=lambda: self._form_then_run(
                              "刪除班級", "remove-class",
@@ -885,11 +940,18 @@ class SwimTab(tk.Frame):
                          command=lambda: self._form_then_run(
                              "刪除排課", "remove-schedule",
                              self._fields_remove_schedule()))
+        menu.add_separator()
+        menu.add_command(label="復原上一步（undo）", command=self._undo_flow)
         try:
             menu.tk_popup(self._more_btn.winfo_rootx(),
                           self._more_btn.winfo_rooty() + self._more_btn.winfo_height())
         finally:
             menu.grab_release()
+
+    def _undo_flow(self):
+        resp = humanize(run_cli(["undo"]), self._class_names())
+        ConfirmDialog(self, "復原上一步", resp,
+                      on_confirm=lambda: self._apply("復原上一步", ["undo"]))
 
     # ---- 新班級精靈（防孤兒班）----
 
