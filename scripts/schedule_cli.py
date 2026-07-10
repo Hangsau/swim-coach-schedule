@@ -11,8 +11,9 @@ schedule_cli.py — LLM-friendly CLI for swim-coach-schedule
 
 子命令：
   status / list-classes / list-slots / list-conflicts
-  add-class / update-class / remove-class
+  add-class / update-class / remove-class / end-class
   add-schedule / remove-schedule / move-lesson
+  split-schedule / cancel-lesson / add-lesson
   preview-add-schedule
 
 退出碼: 0=成功（含 warnings）/ 非 0=失敗
@@ -557,6 +558,87 @@ def cmd_split_schedule(args):
                         "after": after})
 
 
+def cmd_end_class(args):
+    """結束班級：from（含）起不再帶這個班；之前已上堂次全保留（月報表照算）"""
+    data = load_yaml(args.file)
+    classes = data.get("classes") or []
+    if not any(c.get("id") == args.class_id for c in classes):
+        emit(envelope(False,
+                      errors=[_err("E_CLASS_NOT_FOUND", f"class {args.class_id} 不存在")]),
+             args.json)
+    try:
+        from_date = datetime.strptime(args.from_date, "%Y-%m-%d").date()
+    except ValueError:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   f"--from {args.from_date} 不是合法 YYYY-MM-DD")]),
+             args.json)
+    schedules = data.get("schedules", []) or []
+    class_schedules = [s for s in schedules if s.get("class_id") == args.class_id]
+    if not class_schedules:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   f"class {args.class_id} 沒有排課，改用 remove-class")]),
+             args.json)
+    slots_by_id = {s["id"]: s for s in data.get("slots", []) if s.get("id")}
+    classes_by_id = {c["id"]: c for c in classes if c.get("id")}
+    lessons = expand_schedule(schedules, slots_by_id, classes_by_id)
+
+    new_data = copy.deepcopy(data)
+    truncated = []
+    removed_ids = []
+    kept_total = 0
+    removed_total = 0
+
+    for orig in class_schedules:
+        sid = orig.get("id")
+        if not sid:
+            continue
+        sched_lessons = [l for l in lessons if l.get("schedule_id") == sid]
+        kept = sum(1 for l in sched_lessons if l["date"] < from_date)
+        removed = sum(1 for l in sched_lessons if l["date"] >= from_date)
+        kept_total += kept
+        removed_total += removed
+        if removed == 0:
+            continue
+        if kept == 0:
+            new_data["schedules"] = [s for s in new_data["schedules"] if s.get("id") != sid]
+            removed_ids.append(sid)
+            continue
+        ns = next(s for s in new_data["schedules"] if s.get("id") == sid)
+        if "specific_dates" in ns:
+            ns["specific_dates"] = sorted(
+                str(d) for d in ns["specific_dates"]
+                if _parse_date_safe(d) is not None and _parse_date_safe(d) < from_date
+            )
+        else:
+            ns["end_date"] = str(from_date - timedelta(days=1))
+            ns.pop("duration_weeks", None)
+            ns.pop("total_lessons", None)
+        truncated.append(sid)
+
+    class_removed = not any(s.get("class_id") == args.class_id for s in new_data["schedules"])
+    if class_removed:
+        new_data["classes"] = [c for c in new_data["classes"] if c.get("id") != args.class_id]
+
+    _commit_or_preview(args, new_data, {
+        "ended_class_id": args.class_id,
+        "from": args.from_date,
+        "kept_lessons": kept_total,
+        "removed_lessons": removed_total,
+        "schedules_truncated": truncated,
+        "schedules_removed": removed_ids,
+        "class_removed": class_removed,
+    })
+
+
+def _parse_date_safe(d):
+    try:
+        return datetime.strptime(str(d), "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
 def cmd_cancel_lesson(args):
     """取消某堂課不補：在原 schedule 加 except_dates"""
     data = load_yaml(args.file)
@@ -740,6 +822,12 @@ def build_parser():
     ss.add_argument("--note", help="後段備註（例「開學換時段」）")
     ss.add_argument("--apply", action="store_true")
 
+    ec = sub.add_parser("end-class", help="結束班級（保留 from 之前已上堂次，移除之後）")
+    ec.add_argument("--class", dest="class_id", required=True)
+    ec.add_argument("--from", dest="from_date", required=True,
+                    help="從這天起不再上 YYYY-MM-DD")
+    ec.add_argument("--apply", action="store_true")
+
     cl = sub.add_parser("cancel-lesson", help="取消某堂課（不補）")
     cl.add_argument("--class", dest="class_id", required=True)
     cl.add_argument("--date", required=True, help="要取消的日期 YYYY-MM-DD")
@@ -784,6 +872,7 @@ def main():
         "add-class": cmd_add_class,
         "update-class": cmd_update_class,
         "remove-class": cmd_remove_class,
+        "end-class": cmd_end_class,
         "add-schedule": cmd_add_schedule,
         "remove-schedule": cmd_remove_schedule,
         "move-lesson": cmd_move_lesson,
