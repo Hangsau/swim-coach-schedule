@@ -675,8 +675,6 @@ class SwimTab(tk.Frame):
     @staticmethod
     def _fields_add_class():
         return [
-            {"flag": "--id", "label": "班級 ID", "kind": "entry",
-             "required": True, "hint": "例 STU-12"},
             {"flag": "--name", "label": "學員 / 班名", "kind": "entry",
              "required": True},
             {"flag": "--weekly-count", "label": "每週堂數", "kind": "entry",
@@ -910,7 +908,10 @@ class SwimTab(tk.Frame):
         if not resp.get("ok"):
             ConfirmDialog(self, "新班級（第 1 步）", resp)
             return
-        cid = f1.result["--id"]
+        cid = ((resp.get("data") or {}).get("added_class") or {}).get("id")
+        if not cid:
+            ConfirmDialog(self, "新班級（第 1 步）", resp)
+            return
 
         # 第 2 步：排課。沒完成就 rollback，避免孤兒班（CI strict 會擋）
         state = {"applied": False}

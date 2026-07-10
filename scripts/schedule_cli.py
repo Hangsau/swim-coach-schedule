@@ -261,20 +261,27 @@ def validate_all_inline(data_dict, strict=False):
 
 # -------------- commands: write --------------
 
+def next_class_id(classes):
+    nums = [int(m.group(1)) for c in classes
+            if (m := re.match(r"^STU-(\d+)$", str(c.get("id", ""))))]
+    return f"STU-{max(nums, default=0) + 1:02d}"
+
+
 def cmd_add_class(args):
     data = load_yaml(args.file)
     classes = data.setdefault("classes", [])
-    if any(c.get("id") == args.id for c in classes):
-        emit(envelope(False, errors=[_err("E_DUPLICATE_ID", f"class id {args.id} 已存在")],
+    cid = args.id or next_class_id(classes)
+    if any(c.get("id") == cid for c in classes):
+        emit(envelope(False, errors=[_err("E_DUPLICATE_ID", f"class id {cid} 已存在")],
                       next_actions=["改用 update-class 修改現有 class"]), args.json)
-    new_class = {"id": args.id, "name": args.name, "weekly_count": args.weekly_count,
+    new_class = {"id": cid, "name": args.name, "weekly_count": args.weekly_count,
                  "level": args.level or "待確認"}
     if args.note:
         new_class["note"] = args.note
     new_data = copy.deepcopy(data)
     new_data["classes"].append(new_class)
     _commit_or_preview(args, new_data, {"added_class": new_class},
-                       next_actions=[f"下一步：add-schedule --class {args.id} ..."])
+                       next_actions=[f"下一步：add-schedule --class {cid} ..."])
 
 
 def cmd_update_class(args):
@@ -685,7 +692,7 @@ def build_parser():
     sub.add_parser("list-conflicts", help="只列時段衝突")
 
     ac = sub.add_parser("add-class", help="新增 class")
-    ac.add_argument("--id", required=True)
+    ac.add_argument("--id", help="省略則自動編下一個 STU-NN")
     ac.add_argument("--name", required=True)
     ac.add_argument("--weekly-count", type=int, required=True)
     ac.add_argument("--level")
