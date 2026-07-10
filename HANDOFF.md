@@ -1,12 +1,12 @@
 # HANDOFF — swim-coach-schedule
 
 > 狀態快照（每次實質推進後更新）。行為規範見 `CLAUDE.md`，結構見 `MAP.md`。
-> `updated: 2026-07-10`
+> `updated: 2026-07-11`
 
 ## 現況
 
-- schema v3；slots S3–S11、班級 STU-01 起約 10 個、schedules 由 CLI 維護
-- CLI 13 個子命令；README 命令表已含全部 13 個（含 cancel-lesson / add-lesson）
+- schema v3；slots S3–S11、班級 STU-01 起約 12 個、schedules 由 CLI 維護
+- CLI 15 個子命令（新增 end-class / undo）；README 命令表已同步
 - CI（build.yml）：push main → strict validate + pytest + rebuild docs（drift 時 bot auto-commit）→ pages.yml 部署
 - 線上版：https://hangsau.github.io/swim-coach-schedule/
 
@@ -41,6 +41,17 @@
   - 8 個日期欄位全換 date kind（加堂／取消／挪課×2／排課 start+end／精靈 start+end）；`--specific-dates` 逗號多值保持 entry
   - `_fields_update_class` 改 `class_rec` 簽名全欄位預填（含 level——月曆仍隱藏 level，僅編輯表單可改）
 - 發包實錄：第 1 發靜默空回（exit 0 無輸出無改動，v2 同型故障），第 2 發成功；驗證：py_compile + 全 diff 對照 spec + smoke（13 班 175 堂／MiniCal 換月選日／班級列表 13 列／prefill）+ update-class dry-run roundtrip
+
+## 本次（2026-07-11）：W1–W5 易用性五連發
+
+用戶三需求：① 新增班級要自動生成代號 ② 結束班級但保留已上堂次 ③ 整體易用性盤點。
+
+- **W1 自動編號**：`add-class` 的 `--id` 改 optional，`next_class_id()` 掃現有 STU-NN 給下一號；GUI 新班精靈拿掉 ID 欄，改讀回傳 `added_class.id`（c626761）
+- **W2 end-class 子命令**：`end-class --class X --from DATE` 保留 from 之前堂次、移除之後；day 模式設 `end_date`（= from−1）+ 移除 duration_weeks/total_lessons；specific_dates 過濾；kept==0 整條排課移除、班級無排課時連 class 記錄一併移除（過 strict E_ORPHAN_CLASS）；`tests/test_end_class.py` 5 情境（ffbf97c）
+- **W3+W4 GUI 入口**：課 chip 選單與班級選單都有「結束此班（保留已上堂次）…」（chip 版預填該堂日期）與「這班從某天起換時段…」（split-schedule 表單）；ConfirmDialog 顯示「保留 N 堂／移除 M 堂」摘要（1c43c5e）
+- **W5 undo**：`atomic_write` 寫檔前先備份到 `<yaml所在>/.backup/`（保留 10 份）；`undo` 子命令還原最新備份，undo 兩次＝redo；GUI 更多選單加「復原上一步」；`.gitignore` 加 `data/.backup/`（1c43c5e）
+- 已過 /code-audit（自動修 4 項：`_backup_dir`/`BACKUP_GLOB` 抽共用、walrus 免二次 parse、命名兩處；保留 1 項不改）+ 51 tests pass + headless smoke
+- **事故記錄**：發包 claude-m3 期間 m3 對真實 `data/schedule.yaml` 跑了 `--apply` 測試（SCH-014 加 except_date、新增 SCH-019）→ 已 `git checkout` 還原並 strict validate 確認；m3 中途配額耗盡，W3+W4 改派 Sonnet sub-agent 完成
 
 ## 已知事項 / 待辦
 
