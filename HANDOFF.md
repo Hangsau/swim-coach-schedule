@@ -30,6 +30,7 @@
 - 大宗程式碼發包 `claude-m3 -p`（MiniMax 月費，零 Anthropic 配額）產出，Claude 只做 spec／驗證／微修／審查；發包教訓：大檔需 `CLAUDE_CODE_MAX_OUTPUT_TOKENS=32000`，偶發靜默空回直接重試
 - 已過 /code-audit（Step4 微修 3 處 + 審查自動修正 5 項）+ compile + headless smoke（35 格／175 堂／13 班）
 - README GUI 章節已改寫為月曆操作說明
+- v2 驗收六項全過（cancel roundtrip／撞課人話／精靈 rollback 無孤兒／無「待確認」／hub 迴歸／真實上線 e2e）；途中修掉 time-only schedule 硬索引第三處 `test_integration.py::test_duration_weeks_respected`（c4dcf55，同 ff7ac7c 類型）
 
 ## 已知事項 / 待辦
 
