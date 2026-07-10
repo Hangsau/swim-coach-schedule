@@ -253,3 +253,11 @@ schedules:
   - tue
   - thu
   total_lessons: 10
+  except_dates:
+  - '2026-08-18'
+- id: SCH-020
+  class_id: STU-14
+  specific_dates:
+  - '2026-07-14'
+  slot_id: S10
+  time: 20:10-21:10
