@@ -69,11 +69,13 @@ def test_duration_weeks_respected():
 
     for s in data.get('schedules', []):
         if 'days' in s and 'duration_weeks' in s:
-            lessons = [l for l in all_lessons if l['class_id'] == s['class_id'] and l['slot_id'] == s['slot_id']]
-            expected = s['duration_weeks'] * len(s['days'])
+            # time-only schedule 沒有 slot_id → 一律 .get 比對（同 ff7ac7c 修的兩處）
+            lessons = [l for l in all_lessons
+                       if l['class_id'] == s['class_id'] and l.get('slot_id') == s.get('slot_id')]
+            expected = s['duration_weeks'] * len(s['days']) - len(s.get('except_dates') or [])
             actual = len(lessons)
             assert abs(actual - expected) <= 1, \
-                f"schedule {s['class_id']} {s['slot_id']} days={s['days']} duration_weeks={s['duration_weeks']} 預期 {expected} 堂，實際 {actual} 堂（可能被 default 12 週覆蓋）"
+                f"schedule {s['class_id']} {s.get('slot_id')} days={s['days']} duration_weeks={s['duration_weeks']} 預期 {expected} 堂，實際 {actual} 堂（可能被 default 12 週覆蓋）"
     print(f"✓ 所有 days + duration_weeks 模式都跑正確的週數")
 
 
