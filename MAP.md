@@ -37,7 +37,7 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 | `scripts/validate.py` | 510 | schema + 衝突 + 堂數 + 日期驗證；`--strict` 供 CI | pyyaml |
 | `scripts/query.py` | 248 | 唯讀展開 schedules → 具體日期堂次 | pyyaml |
 | `scripts/render_html.py` | 940 | 產 `docs/`：月曆 / grid / summary / index | query.py |
-| `scripts/schedule_gui.py` | ~850 | Tkinter 月曆主視圖編輯器（點課/點日直接操作、新班精靈防孤兒 rollback）；寫入 thin client 全走 CLI subprocess，唯讀展開 import query.py；`build_tab(parent)` 可嵌入 | schedule_cli.py（subprocess）、query.py |
+| `scripts/schedule_gui.py` | ~1030 | Tkinter 月曆主視圖編輯器（點課/點日直接操作、班級列表面板、日期欄 MiniCal 小月曆、新班精靈防孤兒 rollback）；寫入 thin client 全走 CLI subprocess，唯讀展開 import query.py；`build_tab(parent)` 可嵌入 | schedule_cli.py（subprocess）、query.py |
 | `tests/` | 3 檔 | CLI smoke / integration / validate 單元測試（CI 跑） | pytest |
 
 **產物**：`docs/`（render_html 輸出，勿手改）。

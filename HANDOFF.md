@@ -32,6 +32,16 @@
 - README GUI 章節已改寫為月曆操作說明
 - v2 驗收六項全過（cancel roundtrip／撞課人話／精靈 rollback 無孤兒／無「待確認」／hub 迴歸／真實上線 e2e）；途中修掉 time-only schedule 硬索引第三處 `test_integration.py::test_duration_weeks_respected`（c4dcf55，同 ff7ac7c 類型）
 
+### GUI v3（同日加版）：班級列表 + 日期小月曆
+
+- 用戶追加兩需求：① 各班列表可點進去針對該班操作 ② 日期欄用小月曆點選；追加範圍：改班級要能改全部欄位（名稱／堂數／程度／備註）
+- 實作（發包 claude-m3 in-place 編輯，850→1028 行）：
+  - 頭列新增「班級 ▾」→ 班級列表 Toplevel（每班：ID／名稱／每週堂數／未來堂數），點一班開操作選單（修改資料全欄位預填現值／加一堂／新增排課／刪除排課／刪除班級）
+  - 新 `MiniCal` class（stdlib calendar，無新依賴）：FormDialog `kind="date"` 欄位旁 📅 按鈕開小月曆，◀▶ 換月、點日回填 YYYY-MM-DD；grab 巢狀處理（關閉還 grab 給表單）
+  - 8 個日期欄位全換 date kind（加堂／取消／挪課×2／排課 start+end／精靈 start+end）；`--specific-dates` 逗號多值保持 entry
+  - `_fields_update_class` 改 `class_rec` 簽名全欄位預填（含 level——月曆仍隱藏 level，僅編輯表單可改）
+- 發包實錄：第 1 發靜默空回（exit 0 無輸出無改動，v2 同型故障），第 2 發成功；驗證：py_compile + 全 diff 對照 spec + smoke（13 班 175 堂／MiniCal 換月選日／班級列表 13 列／prefill）+ update-class dry-run roundtrip
+
 ## 已知事項 / 待辦
 
 - level 欄位多為「待確認」——資料債，非程式問題（GUI 已隱藏此欄，僅 YAML / CLI 可見）

@@ -120,10 +120,89 @@ def humanize(resp, class_names):
     return resp
 
 
-class FormDialog(tk.Toplevel):
-    """通用表單。fields: [{flag,label,kind(entry|combo|check),values?,hint?,required?,value?}]
+class MiniCal(tk.Toplevel):
+    """迷你月曆：點日回傳 'YYYY-MM-DD' 字串，grab 還給 owner。"""
 
-    value = 預填值（entry/combo 為字串，check 為 bool）。
+    def __init__(self, owner, initial, on_pick, x=None, y=None):
+        super().__init__(owner)
+        try:
+            d = date.fromisoformat(initial) if initial else date.today()
+        except (ValueError, TypeError):
+            d = date.today()
+        self._owner = owner
+        self._on_pick = on_pick
+        self._year, self._month = d.year, d.month
+        self.title("選日期")
+        self.configure(bg=BG, padx=8, pady=6)
+        self.transient(owner)
+        self.resizable(False, False)
+        if x is not None and y is not None:
+            self.geometry(f"+{x}+{y}")
+        # 頭列：◀  /  月份標題  /  ▶
+        head = tk.Frame(self, bg=BG)
+        head.pack(fill="x")
+        make_btn(head, "◀", lambda: self._shift(-1)).pack(side="left")
+        self._title_lbl = tk.Label(head, text="", bg=BG, fg=HEAD, font=F_SEC)
+        self._title_lbl.pack(side="left", expand=True)
+        make_btn(head, "▶", lambda: self._shift(1)).pack(side="right")
+        # 星期表頭
+        wk = tk.Frame(self, bg=BG)
+        wk.pack(fill="x", pady=(4, 2))
+        for zh in WEEKDAY_ZH:
+            tk.Label(wk, text=zh, bg=BG, fg=MUTED, font=F_SMALL,
+                     width=3).pack(side="left")
+        # 日格容器（換月時只清這個）
+        self._grid = tk.Frame(self, bg=BG)
+        self._grid.pack(fill="x")
+        self._draw()
+        self.protocol("WM_DELETE_WINDOW", self._close)
+        self.wait_visibility()
+        self.grab_set()
+
+    def _shift(self, delta):
+        m = self._month + delta
+        self._year += (m - 1) // 12
+        self._month = (m - 1) % 12 + 1
+        for w in self._grid.winfo_children():
+            w.destroy()
+        self._draw()
+
+    def _draw(self):
+        self._title_lbl.config(text=f"{self._year} 年 {self._month} 月")
+        today = date.today()
+        for week in calendar.Calendar(firstweekday=0).monthdatescalendar(
+                self._year, self._month):
+            row = tk.Frame(self._grid, bg=BG)
+            row.pack(fill="x")
+            for d in week:
+                in_month = (d.month == self._month)
+                bg = PANEL if in_month else BG
+                fg = FG if in_month else MUTED
+                if d == today:
+                    fg = HEAD
+                    font = (FONT, 10, "bold")
+                else:
+                    font = F_ROW
+                tk.Button(row, text=str(d.day), relief="flat", bg=bg, fg=fg,
+                          font=font, width=3,
+                          command=lambda dd=d: self._pick(dd)).pack(side="left")
+
+    def _pick(self, d):
+        self._on_pick(str(d))
+        self._close()
+
+    def _close(self):
+        self.destroy()
+        try:
+            self._owner.grab_set()
+        except tk.TclError:
+            pass
+
+
+class FormDialog(tk.Toplevel):
+    """通用表單。fields: [{flag,label,kind(entry|combo|check|date),values?,hint?,required?,value?}]
+
+    value = 預填值（entry/combo/date 為字串，check 為 bool）。
     submit 後 self.result = {flag: str_value 或 True(check)}；空欄位不進 result。
     """
 
@@ -152,6 +231,20 @@ class FormDialog(tk.Toplevel):
                 v = tk.StringVar(value=f.get("value", ""))
                 ttk.Combobox(self, textvariable=v, values=f.get("values", []),
                              width=34, font=F_ROW).grid(row=r, column=1, sticky="we", pady=3)
+            elif f["kind"] == "date":
+                v = tk.StringVar(value=f.get("value", ""))
+                rowf = tk.Frame(self, bg=BG)
+                rowf.grid(row=r, column=1, sticky="we", pady=3)
+                tk.Entry(rowf, textvariable=v, width=26, bg=PANEL, fg=FG,
+                         insertbackground=FG, relief="flat",
+                         font=F_ROW).pack(side="left")
+                btn = tk.Button(rowf, text="📅", bg=TRACK, fg=FG, relief="flat",
+                                font=F_ROW, padx=6)
+                btn.pack(side="left", padx=(4, 0))
+                btn.config(command=lambda b=btn, var=v: MiniCal(
+                    self, var.get(), var.set,
+                    x=b.winfo_rootx(),
+                    y=b.winfo_rooty() + b.winfo_height()))
             else:
                 v = tk.StringVar(value=f.get("value", ""))
                 tk.Entry(self, textvariable=v, width=36, bg=PANEL, fg=FG,
@@ -285,6 +378,7 @@ class SwimTab(tk.Frame):
         more_btn = make_btn(nav, "更多 ▾", self._more_menu)
         more_btn.pack(side="right", padx=4)
         self._more_btn = more_btn
+        make_btn(nav, "班級 ▾", self._class_panel).pack(side="right", padx=4)
         make_btn(nav, "今天", self._goto_today).pack(side="right", padx=4)
         self.month_lbl = tk.Label(nav, text="", bg=BG, fg=HEAD, font=F_SEC)
         self.month_lbl.pack(side="right", padx=6)
@@ -504,21 +598,57 @@ class SwimTab(tk.Frame):
             {"flag": "--class", "label": "班級", "kind": "combo",
              "values": self._class_values(), "value": class_value,
              "required": True},
-            {"flag": "--date", "label": "日期", "kind": "entry",
+            {"flag": "--date", "label": "日期", "kind": "date",
              "value": date_value, "required": True, "hint": "YYYY-MM-DD"},
             *self._slot_time_fields(),
             {"flag": "--note", "label": "備註", "kind": "entry"},
         ]
 
-    def _fields_update_class(self, id_value=""):
+    def _fields_add_schedule(self, class_value=""):
+        return [
+            {"flag": "--class", "label": "班級", "kind": "combo",
+             "values": self._class_values(), "value": class_value,
+             "required": True},
+            *self._slot_time_fields(),
+            {"flag": "--day", "label": "單一星期", "kind": "combo",
+             "values": DAY_NAMES,
+             "hint": "與 --days / --specific-dates 三擇一"},
+            {"flag": "--days", "label": "多個星期", "kind": "entry",
+             "hint": "mon,tue,wed,...（逗號分隔）"},
+            {"flag": "--specific-dates", "label": "指定日期",
+             "kind": "entry",
+             "hint": "YYYY-MM-DD,YYYY-MM-DD"},
+            {"flag": "--start", "label": "開始日", "kind": "date",
+             "required": True, "hint": "YYYY-MM-DD"},
+            {"flag": "--weeks", "label": "持續週數", "kind": "entry",
+             "hint": "週數 / 結束日 / 總堂數 三擇一"},
+            {"flag": "--end", "label": "結束日", "kind": "date",
+             "hint": "YYYY-MM-DD"},
+            {"flag": "--lessons", "label": "總堂數", "kind": "entry"},
+            {"flag": "--note", "label": "備註", "kind": "entry"},
+        ]
+
+    def _fields_update_class(self, class_rec=None):
+        if class_rec is not None:
+            id_val = f"{class_rec['id']}{SEP}{class_rec.get('name') or ''}"
+            name_val = class_rec.get("name") or ""
+            wc_val = str(class_rec.get("weekly_count") or "")
+            level_val = class_rec.get("level") or ""
+            note_val = class_rec.get("note") or ""
+        else:
+            id_val = name_val = wc_val = level_val = note_val = ""
         return [
             {"flag": "--id", "label": "班級 ID", "kind": "combo",
-             "values": self._class_values(), "value": id_value,
+             "values": self._class_values(), "value": id_val,
              "required": True},
-            {"flag": "--name", "label": "新名稱", "kind": "entry"},
-            {"flag": "--weekly-count", "label": "新每週堂數", "kind": "entry",
-             "hint": "整數"},
-            {"flag": "--note", "label": "新備註", "kind": "entry"},
+            {"flag": "--name", "label": "名稱", "kind": "entry",
+             "value": name_val},
+            {"flag": "--weekly-count", "label": "每週堂數", "kind": "entry",
+             "value": wc_val, "hint": "整數"},
+            {"flag": "--level", "label": "程度", "kind": "entry",
+             "value": level_val},
+            {"flag": "--note", "label": "備註", "kind": "entry",
+             "value": note_val},
         ]
 
     def _fields_remove_class(self, id_value=""):
@@ -587,7 +717,7 @@ class SwimTab(tk.Frame):
                                  {"flag": "--class", "label": "班級", "kind": "combo",
                                   "values": self._class_values(), "value": cls_val,
                                   "required": True},
-                                 {"flag": "--date", "label": "日期", "kind": "entry",
+                                 {"flag": "--date", "label": "日期", "kind": "date",
                                   "value": str(lesson["date"]), "required": True},
                                  {"flag": "--reason", "label": "原因", "kind": "entry"},
                              ]))
@@ -597,9 +727,9 @@ class SwimTab(tk.Frame):
                                  {"flag": "--class", "label": "班級", "kind": "combo",
                                   "values": self._class_values(), "value": cls_val,
                                   "required": True},
-                                 {"flag": "--from-date", "label": "原日期", "kind": "entry",
+                                 {"flag": "--from-date", "label": "原日期", "kind": "date",
                                   "value": str(lesson["date"]), "required": True},
-                                 {"flag": "--to-date", "label": "新日期", "kind": "entry",
+                                 {"flag": "--to-date", "label": "新日期", "kind": "date",
                                   "required": True, "hint": "YYYY-MM-DD"},
                                  {"flag": "--to-slot", "label": "新時段（常用）",
                                   "kind": "combo", "values": self._slot_values(),
@@ -616,7 +746,11 @@ class SwimTab(tk.Frame):
         menu.add_command(label="修改班級資料…",
                          command=lambda: self._form_then_run(
                              "修改班級", "update-class",
-                             self._fields_update_class(id_value=cls_val)))
+                             self._fields_update_class(
+                                 class_rec=next(
+                                     (c for c in self._classes
+                                      if c["id"] == lesson["class_id"]),
+                                     None))))
         menu.add_command(label="刪除這條排課…",
                          command=lambda: self._form_then_run(
                              "刪除排課", "remove-schedule",
@@ -665,6 +799,69 @@ class SwimTab(tk.Frame):
         popup.wait_visibility()
         popup.grab_set()
 
+    def _class_panel(self):
+        """班級總覽：列出所有班級與未來堂數，點一列開操作選單。"""
+        panel = tk.Toplevel(self)
+        panel.title("班級列表")
+        panel.configure(bg=BG, padx=12, pady=10)
+        panel.transient(self.winfo_toplevel())
+        tk.Label(panel, text=f"班級（{len(self._classes)}）　點一班開操作選單",
+                 bg=BG, fg=HEAD, font=F_SEC, anchor="w").pack(
+            fill="x", pady=(0, 6))
+        today_d = date.today()
+        for c in sorted(self._classes, key=lambda c: c["id"]):
+            cid = c["id"]
+            name = c.get("name") or ""
+            wc = c.get("weekly_count")
+            wc_str = str(wc) if wc else "?"
+            m = sum(1 for l in self._all_lessons
+                    if l["class_id"] == cid and l["date"] >= today_d)
+            text = f"{cid}　{name}　每週 {wc_str} 堂　未來 {m} 堂"
+            row = tk.Label(panel, text=text, anchor="w", bg=PANEL, fg=FG,
+                           font=F_ROW, padx=8, pady=3)
+            row.pack(fill="x", pady=1)
+            row.bind("<Button-1>",
+                     lambda ev, cc=c, p=panel: (
+                         p.destroy(), self._class_menu(ev, cc)))
+        make_btn(panel, "關閉", panel.destroy, color=PANEL).pack(
+            side="right", pady=(8, 0))
+        panel.wait_visibility()
+        panel.grab_set()
+
+    def _class_menu(self, ev, c):
+        """班級總覽點擊後的操作選單（避開 day_popup，獨立路徑）。"""
+        cls_val = f"{c['id']}{SEP}{c.get('name') or ''}"
+        menu = tk.Menu(self, tearoff=0, bg=PANEL, fg=FG, activebackground=TRACK,
+                       activeforeground=FG, font=F_ROW)
+        menu.add_command(
+            label=f"{c['id']}　{c.get('name') or ''}", state="disabled")
+        menu.add_separator()
+        menu.add_command(label="修改班級資料（名稱／堂數／程度／備註）",
+                         command=lambda: self._form_then_run(
+                             "修改班級", "update-class",
+                             self._fields_update_class(class_rec=c)))
+        menu.add_command(label="這班臨時加一堂",
+                         command=lambda: self._form_then_run(
+                             "加一堂", "add-lesson",
+                             self._fields_add_lesson(class_value=cls_val)))
+        menu.add_command(label="新增每週固定排課",
+                         command=lambda: self._form_then_run(
+                             "新增排課", "add-schedule",
+                             self._fields_add_schedule(class_value=cls_val)))
+        menu.add_separator()
+        menu.add_command(label="刪除排課…",
+                         command=lambda: self._form_then_run(
+                             "刪除排課", "remove-schedule",
+                             self._fields_remove_schedule(class_value=cls_val)))
+        menu.add_command(label="刪除整個班級…",
+                         command=lambda: self._form_then_run(
+                             "刪除班級", "remove-class",
+                             self._fields_remove_class(id_value=cls_val)))
+        try:
+            menu.tk_popup(ev.x_root, ev.y_root)
+        finally:
+            menu.grab_release()
+
     # ---- 頭列「更多 ▾」------
 
     def _more_menu(self):
@@ -684,27 +881,8 @@ class SwimTab(tk.Frame):
         menu.add_separator()
         menu.add_command(label="新增每週固定排課",
                          command=lambda: self._form_then_run(
-                             "新增排課", "add-schedule", [
-                                 {"flag": "--class", "label": "班級", "kind": "combo",
-                                  "values": self._class_values(), "required": True},
-                                 *self._slot_time_fields(),
-                                 {"flag": "--day", "label": "單一星期", "kind": "combo",
-                                  "values": DAY_NAMES,
-                                  "hint": "與 --days / --specific-dates 三擇一"},
-                                 {"flag": "--days", "label": "多個星期", "kind": "entry",
-                                  "hint": "mon,tue,wed,...（逗號分隔）"},
-                                 {"flag": "--specific-dates", "label": "指定日期",
-                                  "kind": "entry",
-                                  "hint": "YYYY-MM-DD,YYYY-MM-DD"},
-                                 {"flag": "--start", "label": "開始日", "kind": "entry",
-                                  "required": True, "hint": "YYYY-MM-DD"},
-                                 {"flag": "--weeks", "label": "持續週數", "kind": "entry",
-                                  "hint": "週數 / 結束日 / 總堂數 三擇一"},
-                                 {"flag": "--end", "label": "結束日", "kind": "entry",
-                                  "hint": "YYYY-MM-DD"},
-                                 {"flag": "--lessons", "label": "總堂數", "kind": "entry"},
-                                 {"flag": "--note", "label": "備註", "kind": "entry"},
-                             ]))
+                             "新增排課", "add-schedule",
+                             self._fields_add_schedule()))
         menu.add_command(label="刪除排課",
                          command=lambda: self._form_then_run(
                              "刪除排課", "remove-schedule",
@@ -741,11 +919,11 @@ class SwimTab(tk.Frame):
             {"flag": "--days", "label": "每週幾", "kind": "entry",
              "value": DAY_NAMES[day.weekday()],
              "hint": "mon,tue,wed,thu,fri,sat,sun（逗號分隔可多天）"},
-            {"flag": "--start", "label": "開始日", "kind": "entry",
+            {"flag": "--start", "label": "開始日", "kind": "date",
              "value": str(day), "hint": "YYYY-MM-DD"},
             {"flag": "--weeks", "label": "持續週數", "kind": "entry",
              "hint": "週數 / 結束日 / 總堂數 三擇一"},
-            {"flag": "--end", "label": "結束日", "kind": "entry"},
+            {"flag": "--end", "label": "結束日", "kind": "date"},
             {"flag": "--lessons", "label": "總堂數", "kind": "entry"},
             {"flag": "--note", "label": "備註", "kind": "entry"},
         ])
