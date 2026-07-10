@@ -91,10 +91,6 @@ classes:
   weekly_count: 1
   level: 待確認
   note: 一家三口；7/17起每週五 20:10-21:10；共10堂（原7/10延後一週）
-- id: TEST-E2E
-  name: GUI驗收測試班
-  weekly_count: 1
-  level: 待確認
 schedules:
 - id: SCH-001
   class_id: STU-01
@@ -249,12 +245,3 @@ schedules:
   day: fri
   total_lessons: 10
   note: 一家三口；7/17起每週五，共10堂（原7/10延後一週）
-- id: SCH-018
-  class_id: TEST-E2E
-  time: 05:00-06:00
-  start_date: '2026-07-13'
-  days:
-  - mon
-  duration_weeks: 2
-  except_dates:
-  - '2026-07-13'
