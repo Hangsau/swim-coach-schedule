@@ -302,10 +302,11 @@ class ConfirmDialog(tk.Toplevel):
         tk.Label(self, text=f"{title}　{head}", bg=BG, fg=(DONE if ok else BAD),
                  font=F_SEC, anchor="w").pack(fill="x")
 
-        d = resp.get("data") or {}
-        if "kept_lessons" in d:
-            summary = f"保留已上 {d['kept_lessons']} 堂／移除未來 {d['removed_lessons']} 堂"
-            if d.get("class_removed"):
+        resp_data = resp.get("data") or {}
+        if "kept_lessons" in resp_data:
+            summary = (f"保留已上 {resp_data['kept_lessons']} 堂／"
+                       f"移除未來 {resp_data['removed_lessons']} 堂")
+            if resp_data.get("class_removed"):
                 summary += "（該班已無任何堂次，班級記錄一併移除）"
             tk.Label(self, text=summary, bg=BG, fg=PROG, font=F_SMALL,
                      anchor="w", wraplength=600, justify="left").pack(fill="x")

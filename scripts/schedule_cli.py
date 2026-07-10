@@ -87,6 +87,11 @@ def dump_yaml_text(data):
 
 
 BACKUP_KEEP = 10
+BACKUP_GLOB = "schedule-*.yaml"
+
+
+def _backup_dir(path):
+    return Path(path).parent / ".backup"
 
 
 def _backup_current(path):
@@ -94,12 +99,12 @@ def _backup_current(path):
     src = Path(path)
     if not src.exists():
         return
-    bdir = src.parent / ".backup"
+    bdir = _backup_dir(path)
     bdir.mkdir(exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     (bdir / f"schedule-{stamp}.yaml").write_text(
         src.read_text(encoding="utf-8"), encoding="utf-8")
-    for old in sorted(bdir.glob("schedule-*.yaml"))[:-BACKUP_KEEP]:
+    for old in sorted(bdir.glob(BACKUP_GLOB))[:-BACKUP_KEEP]:
         old.unlink(missing_ok=True)
 
 
@@ -626,7 +631,7 @@ def cmd_end_class(args):
         if "specific_dates" in ns:
             ns["specific_dates"] = sorted(
                 str(d) for d in ns["specific_dates"]
-                if _parse_date_safe(d) is not None and _parse_date_safe(d) < from_date
+                if (pd := _parse_date_safe(d)) is not None and pd < from_date
             )
         else:
             ns["end_date"] = str(from_date - timedelta(days=1))
@@ -658,13 +663,13 @@ def _parse_date_safe(d):
 
 def cmd_undo(args):
     """復原上一次寫入：還原 .backup/ 最新備份（再 undo 一次 = 還原回去）"""
-    backup_dir = Path(args.file).parent / ".backup"
-    baks = sorted(backup_dir.glob("schedule-*.yaml")) if backup_dir.exists() else []
-    if not baks:
+    backup_dir = _backup_dir(args.file)
+    backups = sorted(backup_dir.glob(BACKUP_GLOB)) if backup_dir.exists() else []
+    if not backups:
         emit(envelope(False,
                       errors=[_err("E_SCHEMA_INVALID", "沒有可復原的備份（.backup/ 是空的）")]),
              args.json)
-    latest = baks[-1]
+    latest = backups[-1]
     new_data = load_yaml(latest)
     _commit_or_preview(args, new_data, {"restored_from": latest.name},
                        next_actions=["復原後再 undo 一次可還原回復原前的狀態"])
