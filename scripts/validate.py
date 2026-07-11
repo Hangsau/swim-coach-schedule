@@ -326,6 +326,62 @@ def validate_schema(data, strict=False):
     return errors, warnings
 
 
+def validate_makeups(data):
+    """待補課帳本（makeups）結構驗證。makeups 為 optional 頂層 list。"""
+    errors = []
+    makeups = data.get("makeups")
+    if makeups is None:
+        return errors
+    if not isinstance(makeups, list):
+        errors.append(_err("E_SCHEMA_INVALID", "makeups 必須是 list", path="makeups"))
+        return errors
+    class_id_set = {c.get("id") for c in (data.get("classes") or []) if c.get("id")}
+    mu_ids = []
+    for i, m in enumerate(makeups):
+        if not isinstance(m, dict):
+            errors.append(_err("E_SCHEMA_INVALID", f"makeups[{i}] 不是 dict", path=f"makeups[{i}]"))
+            continue
+        mid = m.get("id")
+        if not mid or not isinstance(mid, str):
+            errors.append(_err("E_SCHEMA_INVALID", f"makeups[{i}].id 必填非空字串", path=f"makeups[{i}].id"))
+        else:
+            mu_ids.append(mid)
+        if m.get("class_id") not in class_id_set:
+            errors.append(_err("E_CLASS_NOT_FOUND",
+                               f"makeups[{i}].class_id={m.get('class_id')} 不存在於 classes",
+                               path=f"makeups[{i}].class_id", value=m.get("class_id")))
+        status = m.get("status", "pending")
+        if status not in ("pending", "fulfilled"):
+            errors.append(_err("E_SCHEMA_INVALID",
+                               f"makeups[{i}].status 必須是 pending / fulfilled",
+                               path=f"makeups[{i}].status", got=status))
+        od = m.get("origin_date")
+        if od is None:
+            errors.append(_err("E_SCHEMA_INVALID", f"makeups[{i}].origin_date 必填", path=f"makeups[{i}].origin_date"))
+        else:
+            try:
+                _to_date(od)
+            except Exception:
+                errors.append(_err("E_SCHEMA_INVALID", f"makeups[{i}].origin_date 解析失敗",
+                                   path=f"makeups[{i}].origin_date", got=str(od)))
+        if status == "fulfilled":
+            md = m.get("makeup_date")
+            if md is None:
+                errors.append(_err("E_SCHEMA_INVALID",
+                                   f"makeups[{i}] status=fulfilled 需有 makeup_date",
+                                   path=f"makeups[{i}].makeup_date"))
+            else:
+                try:
+                    _to_date(md)
+                except Exception:
+                    errors.append(_err("E_SCHEMA_INVALID", f"makeups[{i}].makeup_date 解析失敗",
+                                       path=f"makeups[{i}].makeup_date", got=str(md)))
+    dup = [k for k, c in Counter(mu_ids).items() if c > 1]
+    for k in dup:
+        errors.append(_err("E_DUPLICATE_ID", f"makeup id 重複: {k}", path="makeups[].id", value=k))
+    return errors
+
+
 def validate_cross(data, strict=False):
     """跨欄位一致性 + lesson 衝突偵測"""
     errors = []
@@ -417,10 +473,11 @@ def validate_cross(data, strict=False):
                     # 同 slot 同班/不同班會被 slot_double_booking 抓；先標衝突
                     pass
                 if time_overlap(a_t, b_t):
-                    pair_key = tuple(sorted([
-                        (a["class_id"], a["slot_id"], a_t),
-                        (b["class_id"], b["slot_id"], b_t),
-                    ]))
+                    # slot_id 可能為 None（time-only schedule，如補課），排序 key 需 None-safe
+                    pair_key = tuple(sorted(
+                        [(a["class_id"], a["slot_id"], a_t),
+                         (b["class_id"], b["slot_id"], b_t)],
+                        key=lambda x: tuple("" if v is None else str(v) for v in x)))
                     pair_full_key = (d, pair_key)
                     if pair_full_key in overlap_pairs:
                         continue
@@ -455,17 +512,21 @@ def validate_all(yaml_path=DEFAULT_YAML, strict=False):
         }
 
     errors, warnings = validate_schema(data, strict=strict)
+    errors.extend(validate_makeups(data))
 
     # 跨欄位（即便 schema 有錯也跑，拿到的衝突資訊只用安全 schedules）
     cross_errors, cross_warnings, lessons = validate_cross(data, strict=strict)
     errors.extend(cross_errors)
     warnings.extend(cross_warnings)
 
+    makeups_all = data.get("makeups", []) or []
     stats = {
         "classes": len(data.get("classes", []) or []),
         "slots": len(data.get("slots", []) or []),
         "schedules": len(data.get("schedules", []) or []),
         "lessons_expanded": len(lessons),
+        "makeups_pending": sum(1 for m in makeups_all
+                               if isinstance(m, dict) and m.get("status", "pending") == "pending"),
         "schema_version": data.get("schema_version"),
     }
     return {

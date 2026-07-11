@@ -5,8 +5,8 @@
 
 ## 現況
 
-- schema v3；slots S3–S11、班級 STU-01 起約 12 個、schedules 由 CLI 維護
-- CLI 16 個子命令（新增 end-class / undo / update-schedule）；README 命令表已同步
+- schema v3；slots S3–S11、班級 STU-01 起約 12 個、schedules 由 CLI 維護；新增 optional 頂層 `makeups`（待補課帳本）
+- CLI 19 個子命令（新增 end-class / undo / update-schedule / cancel-lesson --makeup / fulfill-makeup / list-makeups / cancel-makeup）；README 命令表已同步
 - CI（build.yml）：push main → strict validate + pytest + rebuild docs（drift 時 bot auto-commit）→ pages.yml 部署
 - 線上版：https://hangsau.github.io/swim-coach-schedule/
 
@@ -63,6 +63,25 @@
 - W6/W7 平行發包兩個 Sonnet sub-agent（1 agent = 1 檔避免衝突；spec 內含介面契約讓 GUI 先於 CLI 寫）；W8 + 視窗生命週期修正手動完成
 - `tests/test_update_schedule.py` 9 情境；全套 60 tests pass
 - 已過 /code-audit：自動修 4 項——**修掉一個 crash bug**（`--days mon,banana` 在 preview 展開前未驗星期值 → 裸 ValueError 無 envelope；現回 `E_SCHEMA_INVALID` + allowed 清單）、`NEAR_LESSONS_SHOWN` 常數、`_close_then` 統一、`cands`→`candidates`；保留 3 項不改（changed_fields 逐欄特例／run_cli 測試 helper 重複需 conftest.py 超範圍／E_SCHEDULE_NOT_FOUND emit 為 house style）
+
+## 本次（2026-07-11）：W9 待補課帳本（makeups）
+
+用戶真實痛點：星期六精緻班有兩天確定不能上、還沒排補課；怕自己忘記欠了幾堂。「補課全靠我自己記 我要這個行事曆幹嘛」——行事曆必須替他記住欠補，不是叫他手動追蹤。
+
+- **資料模型**：新增 optional 頂層 `makeups` list，每筆 `{id: MU-NNN, class_id, origin_date, origin_schedule_id, reason, status: pending|fulfilled, makeup_date, makeup_schedule_id}`；additive，不動既有 schema，strict CI 不受影響
+- **CLI（+4 命令，共 19）**：
+  - `cancel-lesson --makeup`：取消那堂（原課進 except_dates）+ 登記一筆 pending 欠補，回 next_action 提示 fulfill 指令
+  - `fulfill-makeup --makeup-id --date (--slot|--time) [--note]`：新增補課那堂（time-only specific_dates）+ 該筆標記 fulfilled 連到新 SCH；防呆 E_MAKEUP_NOT_FOUND / E_MAKEUP_ALREADY_FULFILLED / E_SLOT_NOT_FOUND
+  - `list-makeups [--class] [--status]`（唯讀，預設 pending）、`cancel-makeup --makeup-id`（撤銷登記）
+- **validate**：新增 `validate_makeups`（list 結構、class_id 存在、status 合法、origin_date 可解析、fulfilled 需 makeup_date、MU id 唯一）；stats 加 `makeups_pending`
+- **修掉一個潛藏 crash bug**（回歸測試已固化）：`validate_cross` 的 E_TIME_OVERLAP 排序 key 在 `slot_id=None`（time-only 補課）與有 slot 的課混排時 `None < str` 裸 crash → 改 None-safe key，撞課現在乾淨回 `E_TIME_OVERLAP`
+- **GUI 班級詳情面板改版**（回應「你只給最近的、沒辦法直接改點出來的日期」）：
+  - 班級列表欠補時整列紅字「⚠ 欠補 N 堂」
+  - 詳情頂端紅字「⚠ 還欠 N 堂補課」+ 每筆待補課列（補課… / 撤銷）
+  - 每條排課列出**未來每一堂**日期 chip（每列 8 個換行），點日期 → 單堂選單：取消不補／取消並登記待補／挪到別天／只改這堂時間；已取消未來日期灰字標「已取消」
+  - 移除舊「近 3 堂」常數，改鋪全部
+- `tests/test_makeup.py` 8 情境（含 None-slot overlap 回歸）；全套 68 tests pass；headless GUI smoke（詳情面板 + 待補課 + 班級列表）通過
+- 已過 /code-audit
 
 ## 已知事項 / 待辦
 

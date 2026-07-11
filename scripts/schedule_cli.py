@@ -14,6 +14,7 @@ schedule_cli.py — LLM-friendly CLI for swim-coach-schedule
   add-class / update-class / remove-class / end-class
   add-schedule / update-schedule / remove-schedule / move-lesson
   split-schedule / cancel-lesson / add-lesson / undo
+  fulfill-makeup / list-makeups / cancel-makeup（待補課帳本）
 
 退出碼: 0=成功（含 warnings）/ 非 0=失敗
 """
@@ -171,17 +172,26 @@ def cmd_status(args):
     )
     used_class = {l["class_id"] for l in lessons}
     orphan_classes = [c["id"] for c in data.get("classes", []) if c.get("id") and c["id"] not in used_class]
+    pending_makeups = [
+        {"id": m.get("id"), "class_id": m.get("class_id"),
+         "origin_date": str(m.get("origin_date")), "reason": m.get("reason") or ""}
+        for m in (data.get("makeups", []) or [])
+        if m.get("status", "pending") == "pending"
+    ]
     next_actions = []
     if not result["ok"]:
         next_actions.append("先跑 list-conflicts 看細節，依 error code 處理")
     if orphan_classes:
         next_actions.append(f"孤兒 class（無 schedule）: {orphan_classes}；用 add-schedule 或 remove-class")
+    if pending_makeups:
+        next_actions.append(f"待補課 {len(pending_makeups)} 筆；補課日決定後用 fulfill-makeup 銷帳")
     env = envelope(
         result["ok"],
         data={
             "stats": result["stats"],
             "upcoming_7d": upcoming,
             "orphan_classes": orphan_classes,
+            "pending_makeups": pending_makeups,
         },
         errors=result["errors"],
         warnings=result["warnings"],
@@ -288,6 +298,12 @@ def next_class_id(classes):
     nums = [int(m.group(1)) for c in classes
             if (m := re.match(r"^STU-(\d+)$", str(c.get("id", ""))))]
     return f"STU-{max(nums, default=0) + 1:02d}"
+
+
+def next_makeup_id(makeups):
+    nums = [int(m.group(1)) for mk in makeups
+            if (m := re.match(r"^MU-(\d+)$", str(mk.get("id", ""))))]
+    return f"MU-{max(nums, default=0) + 1:03d}"
 
 
 def cmd_add_class(args):
@@ -682,7 +698,12 @@ def cmd_cancel_lesson(args):
     slots_by_id = {s["id"]: s for s in data.get("slots", []) if s.get("id")}
     classes_by_id = {c["id"]: c for c in data.get("classes", []) if c.get("id")}
     lessons = expand_schedule(schedules, slots_by_id, classes_by_id)
-    target_date = datetime.strptime(args.date, "%Y-%m-%d").date()
+    target_date = _parse_date_safe(args.date)
+    if target_date is None:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   f"日期格式錯誤：{args.date}（需 YYYY-MM-DD）")]),
+             args.json)
     matched = [l for l in lessons if l["class_id"] == args.class_id and l["date"] == target_date]
     if not matched:
         emit(envelope(False,
@@ -714,10 +735,114 @@ def cmd_cancel_lesson(args):
             ed.append(args.date)
             s["except_dates"] = sorted(ed)
             break
+    success = {"cancelled_date": args.date,
+               "schedule_id": src_sched_id,
+               "reason": args.reason or ""}
+    next_actions = None
+    if args.makeup:
+        makeups = new_data.setdefault("makeups", [])
+        mu_id = next_makeup_id(makeups)
+        entry = {"id": mu_id,
+                 "class_id": args.class_id,
+                 "origin_date": args.date,
+                 "origin_schedule_id": src_sched_id,
+                 "reason": args.reason or "",
+                 "status": "pending",
+                 "makeup_date": None,
+                 "makeup_schedule_id": None}
+        makeups.append(entry)
+        success["makeup"] = entry
+        next_actions = [f"補課日決定後：fulfill-makeup --makeup-id {mu_id} "
+                        f"--date <YYYY-MM-DD> --slot <slot> --apply"]
+    _commit_or_preview(args, new_data, success, next_actions=next_actions)
+
+
+def cmd_fulfill_makeup(args):
+    """銷帳一筆待補課：新增補課那堂（specific_dates）+ 標記 makeup fulfilled"""
+    data = load_yaml(args.file)
+    makeups = data.get("makeups", []) or []
+    target = next((m for m in makeups if m.get("id") == args.makeup_id), None)
+    if not target:
+        emit(envelope(False,
+                      errors=[_err("E_MAKEUP_NOT_FOUND",
+                                   f"待補課 {args.makeup_id} 不存在",
+                                   available=[m.get("id") for m in makeups
+                                              if m.get("status", "pending") == "pending"])]),
+             args.json)
+    if target.get("status") == "fulfilled":
+        emit(envelope(False,
+                      errors=[_err("E_MAKEUP_ALREADY_FULFILLED",
+                                   f"{args.makeup_id} 已於 {target.get('makeup_date')} 補課")]),
+             args.json)
+    slots = data.get("slots", []) or []
+    if not args.slot_id and not args.time:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   "--slot 或 --time 至少要指定一個")]),
+             args.json)
+    if args.slot_id and not any(s.get("id") == args.slot_id for s in slots):
+        emit(envelope(False,
+                      errors=[_err("E_SLOT_NOT_FOUND", f"slot {args.slot_id} 不存在")]),
+             args.json)
+    class_id = target.get("class_id")
+    new_data = copy.deepcopy(data)
+    existing_ids = [s.get("id", "") for s in new_data.get("schedules", []) if s.get("id", "").startswith("SCH-")]
+    max_n = max([int(x.split("-")[1]) for x in existing_ids if x.split("-")[1].isdigit()] + [0])
+    new_sched = {"id": f"SCH-{max_n + 1:03d}",
+                 "class_id": class_id,
+                 "specific_dates": [args.date]}
+    if args.time:
+        new_sched["time"] = args.time
+    elif args.slot_id:
+        slot_def = next(s for s in slots if s.get("id") == args.slot_id)
+        new_sched["slot_id"] = args.slot_id
+        new_sched["time"] = slot_def.get("time")
+    new_sched["note"] = args.note or f"補課（原 {target.get('origin_date')}）"
+    new_data.setdefault("schedules", []).append(new_sched)
+    for m in new_data["makeups"]:
+        if m.get("id") == args.makeup_id:
+            m["status"] = "fulfilled"
+            m["makeup_date"] = args.date
+            m["makeup_schedule_id"] = new_sched["id"]
+            break
     _commit_or_preview(args, new_data,
-                       {"cancelled_date": args.date,
-                        "schedule_id": src_sched_id,
-                        "reason": args.reason or ""})
+                       {"fulfilled_makeup": args.makeup_id,
+                        "makeup_date": args.date,
+                        "added_lesson": new_sched})
+
+
+def cmd_list_makeups(args):
+    """列待補課（預設只列 pending）"""
+    data = load_yaml(args.file)
+    makeups = data.get("makeups", []) or []
+    class_names = {c["id"]: c.get("name") for c in data.get("classes", []) if c.get("id")}
+    items = makeups
+    if args.class_id:
+        items = [m for m in items if m.get("class_id") == args.class_id]
+    if args.status != "all":
+        items = [m for m in items if m.get("status", "pending") == args.status]
+    out = []
+    for m in items:
+        e = dict(m)
+        e["class_name"] = class_names.get(m.get("class_id"))
+        out.append(e)
+    pending_total = sum(1 for m in makeups if m.get("status", "pending") == "pending")
+    emit(envelope(True, data={"makeups": out, "count": len(out),
+                              "pending_total": pending_total}), args.json)
+
+
+def cmd_cancel_makeup(args):
+    """撤銷一筆待補課登記（不影響已取消的原課，只是不再欠補）"""
+    data = load_yaml(args.file)
+    makeups = data.get("makeups", []) or []
+    if not any(m.get("id") == args.makeup_id for m in makeups):
+        emit(envelope(False,
+                      errors=[_err("E_MAKEUP_NOT_FOUND", f"待補課 {args.makeup_id} 不存在")]),
+             args.json)
+    new_data = copy.deepcopy(data)
+    new_data["makeups"] = [m for m in new_data.get("makeups", [])
+                           if m.get("id") != args.makeup_id]
+    _commit_or_preview(args, new_data, {"cancelled_makeup": args.makeup_id})
 
 
 def cmd_add_lesson(args):
@@ -1107,11 +1232,30 @@ def build_parser():
     ud = sub.add_parser("undo", help="復原上一次寫入（.backup/ 最新備份）")
     ud.add_argument("--apply", action="store_true")
 
-    cl = sub.add_parser("cancel-lesson", help="取消某堂課（不補）")
+    cl = sub.add_parser("cancel-lesson", help="取消某堂課（--makeup 則登記待補）")
     cl.add_argument("--class", dest="class_id", required=True)
     cl.add_argument("--date", required=True, help="要取消的日期 YYYY-MM-DD")
     cl.add_argument("--reason", help="備註原因（教練生病、學員請假等）")
+    cl.add_argument("--makeup", action="store_true",
+                    help="登記為待補課（欠補），補課日決定後用 fulfill-makeup 銷帳")
     cl.add_argument("--apply", action="store_true")
+
+    fm = sub.add_parser("fulfill-makeup", help="銷帳一筆待補課（新增補課那堂）")
+    fm.add_argument("--makeup-id", dest="makeup_id", required=True, help="待補課 id（例 MU-001）")
+    fm.add_argument("--date", required=True, help="補課日期 YYYY-MM-DD")
+    fm.add_argument("--slot", dest="slot_id", help="常用時段別名")
+    fm.add_argument("--time", help="HH:MM-HH:MM 直接寫")
+    fm.add_argument("--note")
+    fm.add_argument("--apply", action="store_true")
+
+    lm = sub.add_parser("list-makeups", help="列待補課（預設只列 pending）")
+    lm.add_argument("--class", dest="class_id", help="只列某班")
+    lm.add_argument("--status", choices=["pending", "fulfilled", "all"],
+                    default="pending", help="預設 pending")
+
+    cm = sub.add_parser("cancel-makeup", help="撤銷一筆待補課登記（不再欠補）")
+    cm.add_argument("--makeup-id", dest="makeup_id", required=True)
+    cm.add_argument("--apply", action="store_true")
 
     al = sub.add_parser("add-lesson", help="臨時加一堂（單日）")
     al.add_argument("--class", dest="class_id", required=True)
@@ -1175,6 +1319,9 @@ def main():
         "split-schedule": cmd_split_schedule,
         "cancel-lesson": cmd_cancel_lesson,
         "add-lesson": cmd_add_lesson,
+        "fulfill-makeup": cmd_fulfill_makeup,
+        "list-makeups": cmd_list_makeups,
+        "cancel-makeup": cmd_cancel_makeup,
     }
     dispatch[args.cmd](args)
 

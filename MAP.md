@@ -3,7 +3,7 @@
 > 結構地圖，給冷啟動讀者（人/LLM）。格式見 `C:\claudehome\CODEBASE_MAP_METHODOLOGY.md`。
 > 行為規範見 `CLAUDE.md`；進度/待辦見 `HANDOFF.md`。
 >
-> `last_verified: 2026-07-11`
+> `last_verified: 2026-07-11`（W9 待補課帳本）
 
 ---
 
@@ -18,10 +18,10 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 
 | 你要做的事 | 動這裡 |
 |-----------|--------|
-| 增刪改班級 / 排課（程式路徑） | `scripts/schedule_cli.py`（1183 行，16 子命令；起始日填錯走 update-schedule 就地改） |
+| 增刪改班級 / 排課（程式路徑） | `scripts/schedule_cli.py`（1325 行，19 子命令；起始日填錯走 update-schedule；停課補課走 cancel-lesson --makeup → fulfill-makeup） |
 | 用滑鼠增刪改 + 一鍵 push | `scripts/schedule_gui.py`（Tkinter 月曆主視圖；嵌桌面看板 hub） |
 | 唯讀查課表 | `scripts/query.py`（today/week/month/day/class/slot） |
-| 改驗證規則（衝突 / 堂數 / 日期） | `scripts/validate.py`（510 行） |
+| 改驗證規則（衝突 / 堂數 / 日期 / 待補課） | `scripts/validate.py`（571 行） |
 | 改行事曆頁面長相 | `scripts/render_html.py`（940 行 → `docs/`） |
 | 改 CI / Pages 部署 | `.github/workflows/build.yml`、`pages.yml` |
 | 查 CLI 錯誤碼含義 | `README.md` 錯誤碼處理表 |
@@ -32,13 +32,13 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 
 | 檔 | 行 | 職責 | 依賴 |
 |----|----|------|------|
-| `data/schedule.yaml` | ~250 | 唯一資料來源：slots / classes / schedules（schema v3） | — |
-| `scripts/schedule_cli.py` | 1183 | 全部寫入路徑；envelope + preview_diff + atomic_write（寫前備份至 `.backup/` 供 undo）；寫前 inline validate；update-schedule 就地改欄 + past_lessons_lost 防呆 | validate.py |
-| `scripts/validate.py` | 510 | schema + 衝突 + 堂數 + 日期驗證；`--strict` 供 CI | pyyaml |
+| `data/schedule.yaml` | ~250 | 唯一資料來源：slots / classes / schedules（schema v3）+ optional `makeups`（待補課帳本） | — |
+| `scripts/schedule_cli.py` | 1325 | 全部寫入路徑；envelope + preview_diff + atomic_write（寫前備份至 `.backup/` 供 undo）；寫前 inline validate；update-schedule 就地改欄 + past_lessons_lost 防呆；cancel-lesson --makeup / fulfill-makeup / cancel-makeup 待補課帳本 | validate.py |
+| `scripts/validate.py` | 571 | schema + 衝突 + 堂數 + 日期 + makeups 驗證；`--strict` 供 CI（E_TIME_OVERLAP 排序 key 已 None-safe，防 time-only 補課 crash） | pyyaml |
 | `scripts/query.py` | 248 | 唯讀展開 schedules → 具體日期堂次 | pyyaml |
 | `scripts/render_html.py` | 940 | 產 `docs/`：月曆 / grid / summary / index | query.py |
-| `scripts/schedule_gui.py` | ~1316 | Tkinter 月曆主視圖編輯器（點課/點日直接操作、班級列表→班級詳情面板（每條排課已上/未來堂數＋就地修改入口）、日期欄 MiniCal 小月曆、新班精靈防孤兒 rollback、結束班級/換時段/undo 入口）；寫入 thin client 全走 CLI subprocess，唯讀展開 import query.py；`build_tab(parent)` 可嵌入 | schedule_cli.py（subprocess）、query.py |
-| `tests/` | 5 檔 | CLI smoke / integration / validate / end-class / update-schedule 測試（CI 跑） | pytest |
+| `scripts/schedule_gui.py` | ~1468 | Tkinter 月曆主視圖編輯器（點課/點日直接操作、班級列表→班級詳情面板（每條排課列出未來每一堂日期 chip＋單堂取消/挪天/改時間、待補課紅字帳本＋一鍵補課、就地修改入口）、日期欄 MiniCal 小月曆、新班精靈防孤兒 rollback、結束班級/換時段/undo 入口）；寫入 thin client 全走 CLI subprocess，唯讀展開 import query.py；`build_tab(parent)` 可嵌入 | schedule_cli.py（subprocess）、query.py |
+| `tests/` | 6 檔 | CLI smoke / integration / validate / end-class / update-schedule / makeup 測試（CI 跑） | pytest |
 
 **產物**：`docs/`（render_html 輸出，勿手改）。
 
@@ -50,5 +50,6 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 2. **schedule 內 `time` 欄位是凍結值**：改 `slots[].time` 不影響既有 schedule（設計如此，防止改 slot 打到歷史）。
 3. **CI auto-commit**：push 後若 docs drift，bot 會補一個 commit → 本地隨即落後 remote；下次 push 前必 `fetch` + `pull --ff-only`（GUI 一鍵上線已內建）。drift 常見成因：render 的「更新時間 / today 高亮」依執行當地日期，本機（UTC+8）與 CI（UTC）跨日時必 drift，屬正常現象。
 4. **cp950**：所有 script 輸出含中文，subprocess / console 必 `PYTHONIOENCODING=utf-8`，GUI 內部 subprocess helper 已強制。
-5. **README 命令表 vs CLI**：2026-07-11 已同步 16 命令（含 end-class / undo / update-schedule）；日後加子命令記得同步，權威來源是 `build_parser()`（schedule_cli.py:1035）。
+5. **README 命令表 vs CLI**：2026-07-11 已同步 19 命令（含 end-class / undo / update-schedule / fulfill-makeup / list-makeups / cancel-makeup）；日後加子命令記得同步，權威來源是 `build_parser()`。
 6. **undo 備份目錄跟著 yaml 走**：`_backup_dir()` = `<yaml 檔所在>/.backup/`（保留 10 份），所以測試用 tmp 檔不會污染 `data/.backup/`；`data/.backup/` 已入 `.gitignore`。
+7. **`makeups` 是 additive optional 頂層 key**：`validate_all` 忽略未知頂層 key，加它不破 strict CI；補課那堂用 time-only（無 slot_id）specific_dates，`validate_cross` 排序 key 已 None-safe，勿改回裸 `sorted(tuple)`。
