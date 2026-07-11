@@ -67,7 +67,7 @@ classes:
   level: 待確認
   note: 每週四代課 20:10-21:10
 - id: STU-10
-  name: 精緻班(成人*1)
+  name: 精緻班(成人潘*1)
   weekly_count: 3
   level: 待確認
   note: 成人1人；7/10起週一三五；共10堂
@@ -82,7 +82,7 @@ classes:
   level: 待確認
   note: 每週三 18:00-19:00，7/8 起共10堂
 - id: STU-13
-  name: 精緻班
+  name: 精緻班S10一三
   weekly_count: 2
   level: 待確認
   note: 每週一三 20:10-21:10，7/27 起共10堂
