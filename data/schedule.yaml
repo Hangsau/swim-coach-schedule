@@ -72,12 +72,12 @@ classes:
   level: 待確認
   note: 成人1人；7/10起週一三五；共10堂
 - id: STU-11
-  name: 精緻班(兒童*4)
+  name: 精緻班S3 星期六
   weekly_count: 1
   level: 待確認
   note: 兒童4人；7/11起週六；共10堂
 - id: STU-12
-  name: 精緻班
+  name: 精緻班S11 星期三
   weekly_count: 1
   level: 待確認
   note: 每週三 18:00-19:00，7/8 起共10堂
@@ -221,6 +221,8 @@ schedules:
   except_dates:
   - '2026-07-11'
   - '2026-07-18'
+  - '2026-07-25'
+  - '2026-08-08'
 - id: SCH-015
   class_id: STU-12
   slot_id: S11
@@ -263,3 +265,20 @@ schedules:
   - '2026-07-18'
   slot_id: S7
   time: 15:20-16:20
+makeups:
+- id: MU-001
+  class_id: STU-11
+  origin_date: '2026-07-25'
+  origin_schedule_id: SCH-014
+  reason: ''
+  status: pending
+  makeup_date: null
+  makeup_schedule_id: null
+- id: MU-002
+  class_id: STU-11
+  origin_date: '2026-08-08'
+  origin_schedule_id: SCH-014
+  reason: ''
+  status: pending
+  makeup_date: null
+  makeup_schedule_id: null
