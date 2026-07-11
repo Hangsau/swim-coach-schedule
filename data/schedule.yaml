@@ -52,7 +52,7 @@ classes:
   weekly_count: 2
   level: 待確認
 - id: STU-07
-  name: 精緻班初級班代課
+  name: 初級班代課S8 星期四
   weekly_count: 1
   level: 待確認
   note: 每週四代課 17:00-18:00
@@ -62,7 +62,7 @@ classes:
   level: 待確認
   note: 每週一到五 19:00-20:00
 - id: STU-09
-  name: 精緻班初級班代課
+  name: 初級班代課S10 星期四
   weekly_count: 1
   level: 待確認
   note: 每週四代課 20:10-21:10
