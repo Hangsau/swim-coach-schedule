@@ -220,6 +220,7 @@ schedules:
   note: 兒童；週六 9:00；共10堂
   except_dates:
   - '2026-07-11'
+  - '2026-07-18'
 - id: SCH-015
   class_id: STU-12
   slot_id: S11
@@ -256,3 +257,9 @@ schedules:
   except_dates:
   - '2026-08-18'
   - '2026-08-20'
+- id: SCH-020
+  class_id: STU-11
+  specific_dates:
+  - '2026-07-18'
+  slot_id: S7
+  time: 15:20-16:20
