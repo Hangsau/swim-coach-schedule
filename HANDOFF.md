@@ -6,7 +6,7 @@
 ## 現況
 
 - schema v3；slots S3–S11、班級 STU-01 起約 12 個、schedules 由 CLI 維護
-- CLI 15 個子命令（新增 end-class / undo）；README 命令表已同步
+- CLI 16 個子命令（新增 end-class / undo / update-schedule）；README 命令表已同步
 - CI（build.yml）：push main → strict validate + pytest + rebuild docs（drift 時 bot auto-commit）→ pages.yml 部署
 - 線上版：https://hangsau.github.io/swim-coach-schedule/
 
@@ -52,6 +52,17 @@
 - **W5 undo**：`atomic_write` 寫檔前先備份到 `<yaml所在>/.backup/`（保留 10 份）；`undo` 子命令還原最新備份，undo 兩次＝redo；GUI 更多選單加「復原上一步」；`.gitignore` 加 `data/.backup/`（1c43c5e）
 - 已過 /code-audit（自動修 4 項：`_backup_dir`/`BACKUP_GLOB` 抽共用、walrus 免二次 parse、命名兩處；保留 1 項不改）+ 51 tests pass + headless smoke
 - **事故記錄**：發包 claude-m3 期間 m3 對真實 `data/schedule.yaml` 跑了 `--apply` 測試（SCH-014 加 except_date、新增 SCH-019）→ 已 `git checkout` 還原並 strict validate 確認；m3 中途配額耗盡，W3+W4 改派 Sonnet sub-agent 完成
+
+## 本次（2026-07-11）：W6–W8 排課詳情與就地修改
+
+用戶兩需求：① 每班可看排課狀態（日期、已上/未來堂數）並直接從班級進入修改 ② 起始日填錯要能就地改（先前只能刪掉重排）。
+
+- **W6 `update-schedule` 子命令**：`--schedule-id` 直接鎖定（或 `--class` 單條自動鎖、多條回 `E_AMBIGUOUS_TARGET` + candidates 清單）；可改 start/end/weeks/lessons/day/days/slot/time/note 任意欄位，三擇一欄位（weeks/end/lessons）設一個自動清掉另兩個；dry-run 回報 `lessons_before/after`、`first_lesson/last_lesson`、**`past_lessons_lost`**（改日期會弄丟幾堂已上過的課，防呆核心）。`remove-schedule` 同步支援 `--schedule-id` 指定刪除單條
+- **W7 GUI 班級詳情面板**：班級列表點一班 → 詳情視窗（每條排課一列：星期／時段／起始日／總堂數／已上 N・未來 M／近 3 堂日期），點排課列開選單（修改此排課＝update-schedule 全欄位預填／從某天起換時段／刪除此排課），底部班級級操作（修改資料／加一堂／新增排課／結束此班／刪除班級）；開表單前先關詳情視窗（Toplevel 不受 refresh 重繪、防 grab 衝突）
+- **W8 ConfirmDialog 改動摘要**：apply 確認框顯示「改動後共 N 堂（原 M 堂），第一堂／最後一堂日期」；`past_lessons_lost > 0` 時紅字警告「有 N 堂已上過的課會因此消失」
+- W6/W7 平行發包兩個 Sonnet sub-agent（1 agent = 1 檔避免衝突；spec 內含介面契約讓 GUI 先於 CLI 寫）；W8 + 視窗生命週期修正手動完成
+- `tests/test_update_schedule.py` 9 情境；全套 60 tests pass
+- 已過 /code-audit：自動修 4 項——**修掉一個 crash bug**（`--days mon,banana` 在 preview 展開前未驗星期值 → 裸 ValueError 無 envelope；現回 `E_SCHEMA_INVALID` + allowed 清單）、`NEAR_LESSONS_SHOWN` 常數、`_close_then` 統一、`cands`→`candidates`；保留 3 項不改（changed_fields 逐欄特例／run_cli 測試 helper 重複需 conftest.py 超範圍／E_SCHEDULE_NOT_FOUND emit 為 house style）
 
 ## 已知事項 / 待辦
 

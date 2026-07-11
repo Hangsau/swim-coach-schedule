@@ -57,6 +57,7 @@ CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 SEP = "｜"           # combo 顯示值「id｜名稱」的分隔符，顯示與解析共用
 ERR_TAIL = 400       # 畫面上錯誤訊息截尾長度
 ERR_TAIL_LONG = 800  # envelope 錯誤訊息截尾長度
+NEAR_LESSONS_SHOWN = 3  # 班級詳情每條排課顯示幾堂最近的課
 
 MAX_CHIPS = 3        # 每日格最多直接顯示的課數，超過收進「+N」
 CHIP_FG = "#e8eaee"      # 班級 chip 上的亮字
@@ -1078,9 +1079,8 @@ class SwimTab(tk.Frame):
                                 key=lambda l: l["date"])
                 counts_txt = f"已上 {len(past)}／未來 {len(future)}"
 
-                # 近 3 堂
-                near = future[:3]
-                near_txt = "近 3 堂：" + "、".join(
+                near = future[:NEAR_LESSONS_SHOWN]
+                near_txt = f"近 {NEAR_LESSONS_SHOWN} 堂：" + "、".join(
                     f"{l['date'].month}/{l['date'].day}" for l in near) if near else ""
 
                 line = "　".join(filter(None, [
@@ -1106,32 +1106,31 @@ class SwimTab(tk.Frame):
         btns = tk.Frame(win, bg=BG)
         btns.pack(fill="x")
 
-        def _do_then_close(fn):
-            win.destroy()
-            fn()
+        def _close_then(fn):
+            return lambda: (win.destroy(), fn())
 
         make_btn(btns, "修改資料",
-                 lambda: _do_then_close(lambda: self._form_then_run(
+                 _close_then(lambda: self._form_then_run(
                      "修改班級", "update-class",
                      self._fields_update_class(class_rec=c)))).pack(
             side="left", padx=4)
         make_btn(btns, "加一堂",
-                 lambda: _do_then_close(lambda: self._form_then_run(
+                 _close_then(lambda: self._form_then_run(
                      "加一堂", "add-lesson",
                      self._fields_add_lesson(class_value=cls_val)))).pack(
             side="left", padx=4)
         make_btn(btns, "新增排課",
-                 lambda: _do_then_close(lambda: self._form_then_run(
+                 _close_then(lambda: self._form_then_run(
                      "新增排課", "add-schedule",
                      self._fields_add_schedule(class_value=cls_val)))).pack(
             side="left", padx=4)
         make_btn(btns, "結束此班…",
-                 lambda: _do_then_close(lambda: self._form_then_run(
+                 _close_then(lambda: self._form_then_run(
                      "結束班級", "end-class",
                      self._fields_end_class(class_value=cls_val)))).pack(
             side="left", padx=4)
         make_btn(btns, "刪除班級…",
-                 lambda: _do_then_close(lambda: self._form_then_run(
+                 _close_then(lambda: self._form_then_run(
                      "刪除班級", "remove-class",
                      self._fields_remove_class(id_value=cls_val)))).pack(
             side="left", padx=4)

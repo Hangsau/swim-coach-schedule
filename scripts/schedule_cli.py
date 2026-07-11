@@ -41,7 +41,7 @@ DEFAULT_YAML = ROOT / "data" / "schedule.yaml"
 
 sys.path.insert(0, str(Path(__file__).parent))
 from validate import validate_all, time_overlap, DAYS  # noqa: E402
-from query import expand_schedule  # noqa: E402
+from query import DAY_NAMES, expand_schedule  # noqa: E402
 
 
 # -------------- envelope helpers --------------
@@ -778,26 +778,26 @@ def cmd_update_schedule(args):
                           next_actions=["用 list-classes --with-schedules 查現有 schedule id"]),
                  args.json)
     elif args.class_id:
-        cands = [s for s in schedules if s.get("class_id") == args.class_id]
-        if len(cands) == 0:
+        candidates = [s for s in schedules if s.get("class_id") == args.class_id]
+        if len(candidates) == 0:
             emit(envelope(False,
                           errors=[_err("E_SCHEDULE_NOT_FOUND",
                                        f"class {args.class_id} 沒有任何 schedule")],
                           next_actions=["用 add-schedule 新增"]),
                  args.json)
-        elif len(cands) == 1:
-            target = cands[0]
+        elif len(candidates) == 1:
+            target = candidates[0]
         else:
             candidates_info = [
                 {"id": c.get("id"),
                  "day": c.get("day"),
                  "days": c.get("days"),
                  "time": c.get("time")}
-                for c in cands
+                for c in candidates
             ]
             emit(envelope(False,
                           errors=[_err("E_AMBIGUOUS_TARGET",
-                                       f"class {args.class_id} 有 {len(cands)} 條 schedule，請用 --schedule-id 指定",
+                                       f"class {args.class_id} 有 {len(candidates)} 條 schedule，請用 --schedule-id 指定",
                                        candidates=candidates_info)],
                           next_actions=[f"加 --schedule-id {c['id']} 重試" for c in candidates_info]),
                  args.json)
@@ -828,6 +828,20 @@ def cmd_update_schedule(args):
         emit(envelope(False,
                       errors=[_err("E_SCHEMA_INVALID",
                                    "--day 和 --days 不能同時指定")]),
+             args.json)
+
+    # 星期值驗證（preview 會先展開堂次，壞值不擋會 ValueError）
+    if args.day is not None:
+        bad_days = [args.day] if args.day not in DAY_NAMES else []
+    elif args.days is not None:
+        bad_days = [d for d in _parse_days(args.days) if d not in DAY_NAMES]
+    else:
+        bad_days = []
+    if bad_days:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   f"不合法的星期值：{','.join(bad_days)}",
+                                   allowed=list(DAY_NAMES))]),
              args.json)
 
     # 日期格式驗證

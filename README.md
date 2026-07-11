@@ -163,7 +163,8 @@ python scripts/schedule_cli.py --json add-schedule --class STU-04 --slot S5 --da
 | `end-class --class --from` | 結束班級：from（含）之後堂次移除、之前保留；全無保留堂次時班級一併移除 | 是 |
 | `undo` | 復原上一次寫入（`data/.backup/` 最新備份；連按兩次 = 還原回去） | 是 |
 | `add-schedule --class (--slot\|--time) --start --(day\|days\|specific-dates) [--weeks\|--end\|--lessons] [--note]` | 新增 schedule | 是 |
-| `remove-schedule --class [--slot-id] [--day] [--all]` | 刪 schedule | 是 |
+| `update-schedule (--schedule-id\|--class) [--start] [--end\|--weeks\|--lessons] [--day\|--days] [--slot\|--time] [--note]` | 就地改一條 schedule 的任意欄位（起始日填錯的救援路徑）；dry-run 回報前後堂數與 `past_lessons_lost` | 是 |
+| `remove-schedule (--schedule-id \| --class [--slot-id] [--day] [--all])` | 刪 schedule（`--schedule-id` 直刪指定條） | 是 |
 | `move-lesson --class --from-date --to-date [--to-slot\|--to-time] [--note]` | 挪一堂課（補課） | 是 |
 | `cancel-lesson --class --date [--reason]` | 取消一堂（不補） | 是 |
 | `add-lesson --class --date (--slot\|--time) [--note]` | 臨時加一堂（單日） | 是 |
@@ -176,14 +177,15 @@ python scripts/schedule_cli.py --json add-schedule --class STU-04 --slot S5 --da
 | `E_CLASS_NOT_FOUND` | class id 不存在 | 拼字確認；不存在就先 `add-class` |
 | `E_SLOT_NOT_FOUND` | slot id 不存在 | `list-slots` 查可用 id；或改用 `--time HH:MM-HH:MM` 直接寫 |
 | `E_DUPLICATE_ID` | 該 id 已存在 | 改用 `update-class` 或換一個 id |
-| `E_DUPLICATE_SCHEDULE` | 完全相同的 schedule 重複 | 不需重加；改用 `update-schedule`（未來實作）或先 remove |
+| `E_DUPLICATE_SCHEDULE` | 完全相同的 schedule 重複 | 不需重加；改用 `update-schedule` 或先 remove |
+| `E_SCHEDULE_NOT_FOUND` | schedule id 不存在（或該班沒有 schedule） | 看 `context.available`；`list-classes --with-schedules` 查 id |
 | `E_TIME_OVERLAP` | 兩堂課時段重疊（教練只有一人） | 看 `context.lesson_a/b`；改時段或挪其中一堂 |
 | `E_WEEKLY_COUNT_EXCEEDED` | 排的堂數 > class.weekly_count | 先 `update-class --weekly-count` 拉高，或減 schedule |
 | `E_INVALID_DATE_RANGE` | end_date <= start_date / time 反序 / 跨午夜 | 修日期或時段 |
 | `E_PAST_DATE` / `W_PAST_DATE` | specific_date 早於 today-7d | 補登資料可保留（warning）；strict mode 拒絕 |
 | `E_DATE_TOO_FAR` | 日期超過合理 horizon | 拆短週期，或檢查日期 |
 | `E_NO_TERMINATION` | day/days 沒帶 duration_weeks/end_date/total_lessons | 加一個終止條件 |
-| `E_AMBIGUOUS_TARGET` | remove 命中多條或孤兒問題 | 看 `context.matches` 縮條件，或加 `--all`/`--cascade` |
+| `E_AMBIGUOUS_TARGET` | 命中多條 schedule（remove / update / split） | 看 `context.matches` 或 `context.candidates`，加 `--schedule-id` 指定，或 `--all`/`--cascade` |
 | `E_SCHEMA_INVALID` | 欄位格式錯 | 看 `context.path` 修對應欄位 |
 | `E_VALIDATE_FAILED` | 寫入前 validate 整批失敗 | 看 errors[] 細項 |
 
