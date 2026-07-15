@@ -184,6 +184,7 @@ schedules:
   - '2026-07-10'
   - '2026-07-13'
   - '2026-07-14'
+  - '2026-07-15'
   note: 7/6、7/7、7/8 取消，不補課
 - id: SCH-011
   class_id: STU-09
@@ -204,6 +205,8 @@ schedules:
   - fri
   end_date: '2026-07-31'
   note: 成人；週一五 15:20
+  except_dates:
+  - '2026-07-17'
 - id: SCH-013
   class_id: STU-10
   slot_id: S4
@@ -280,6 +283,14 @@ makeups:
   class_id: STU-11
   origin_date: '2026-08-08'
   origin_schedule_id: SCH-014
+  reason: ''
+  status: pending
+  makeup_date: null
+  makeup_schedule_id: null
+- id: MU-003
+  class_id: STU-10
+  origin_date: '2026-07-17'
+  origin_schedule_id: SCH-012
   reason: ''
   status: pending
   makeup_date: null
