@@ -198,7 +198,6 @@ python scripts/schedule_cli.py --json add-schedule --class STU-04 --slot S5 --da
 | `E_TIME_OVERLAP` | 兩堂課時段重疊（教練只有一人） | 看 `context.lesson_a/b`；改時段或挪其中一堂 |
 | `E_WEEKLY_COUNT_EXCEEDED` | 排的堂數 > class.weekly_count | 先 `update-class --weekly-count` 拉高，或減 schedule |
 | `E_INVALID_DATE_RANGE` | end_date <= start_date / time 反序 / 跨午夜 | 修日期或時段 |
-| `E_PAST_DATE` / `W_PAST_DATE` | specific_date 早於 today-7d | 補登資料可保留（warning）；strict mode 拒絕 |
 | `E_DATE_TOO_FAR` | 日期超過合理 horizon | 拆短週期，或檢查日期 |
 | `E_NO_TERMINATION` | day/days 沒帶 duration_weeks/end_date/total_lessons | 加一個終止條件 |
 | `E_AMBIGUOUS_TARGET` | 命中多條 schedule（remove / update / split） | 看 `context.matches` 或 `context.candidates`，加 `--schedule-id` 指定，或 `--all`/`--cascade` |

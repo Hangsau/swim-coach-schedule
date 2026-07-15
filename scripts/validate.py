@@ -38,7 +38,6 @@ from query import expand_schedule  # 共用 expand 邏輯，避免 drift
 DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-HORIZON_PAST_DAYS = 7      # specific_dates 容許 today - 7 天內（補登）
 HORIZON_FUTURE_DAYS = 365  # specific_dates 容許 today + 365 天內
 START_DATE_FUTURE_DAYS = 730  # schedules.start_date 最遠未來 2 年
 
@@ -141,7 +140,6 @@ def validate_schema(data, strict=False):
     # --- schedules ---
     today = date.today()
     start_future_max = today + timedelta(days=START_DATE_FUTURE_DAYS)
-    horizon_past = today - timedelta(days=HORIZON_PAST_DAYS)
     horizon_future = today + timedelta(days=HORIZON_FUTURE_DAYS)
 
     schedule_keys = []  # for duplicate detection
@@ -247,13 +245,6 @@ def validate_schema(data, strict=False):
                                            f"schedules[{i}].specific_dates[{j}] 解析失敗",
                                            path=f"schedules[{i}].specific_dates[{j}]", got=str(d)))
                         continue
-                    if dt < horizon_past:
-                        code = "E_PAST_DATE" if strict else "W_PAST_DATE"
-                        msg = f"schedules[{i}].specific_dates[{j}]={dt} 早於 today-{HORIZON_PAST_DAYS}d"
-                        (errors if strict else warnings).append(
-                            _err(code, msg, path=f"schedules[{i}].specific_dates[{j}]",
-                                 value=str(dt), today=str(today))
-                        )
                     if dt > horizon_future:
                         errors.append(_err("E_DATE_TOO_FAR",
                                            f"schedules[{i}].specific_dates[{j}]={dt} 超過 today+{HORIZON_FUTURE_DAYS}d",

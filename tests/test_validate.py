@@ -3,7 +3,7 @@ test_validate.py — validate.py 單元測試
 
 涵蓋 codex review 指出的所有攻擊面：
 - 時段重疊
-- specific_dates 過去 / 太遠未來 / 五年後
+- specific_dates 歷史日期 / 太遠未來 / 五年後
 - weekly_count 超出
 - duplicate schedule
 - 終止條件缺失
@@ -105,8 +105,8 @@ def test_specific_dates_too_far_future():
     assert any(e["code"] == "E_DATE_TOO_FAR" for e in r["errors"])
 
 
-def test_specific_dates_past_warn_only():
-    """specific_date 過去 → 非 strict 是 warning，strict 是 error"""
+def test_specific_dates_history_allowed_in_strict_mode():
+    """歷史 specific_date 是已完成課程紀錄，strict mode 也必須保留。"""
     data = _base()
     past = date.today() - timedelta(days=30)
     data["schedules"].append({
@@ -114,13 +114,9 @@ def test_specific_dates_past_warn_only():
         "specific_dates": [str(past)],
     })
     p = _write(data)
-    r = validate_all(p, strict=False)
-    assert r["ok"]  # warning 不 fail
-    assert any(w["code"] == "W_PAST_DATE" for w in r["warnings"])
-
     r_strict = validate_all(p, strict=True)
-    assert not r_strict["ok"]
-    assert any(e["code"] == "E_PAST_DATE" for e in r_strict["errors"])
+    assert r_strict["ok"], r_strict
+    assert not any(e["code"] == "E_PAST_DATE" for e in r_strict["errors"])
 
 
 # -------------- weekly_count（攻擊 3 剋星） --------------
