@@ -271,6 +271,13 @@ schedules:
   - '2026-07-18'
   slot_id: S7
   time: 15:20-16:20
+- id: SCH-021
+  class_id: STU-10
+  specific_dates:
+  - '2026-08-03'
+  slot_id: S7
+  time: 15:20-16:20
+  note: 補課（原 2026-07-17）
 makeups:
 - id: MU-001
   class_id: STU-11
@@ -293,6 +300,6 @@ makeups:
   origin_date: '2026-07-17'
   origin_schedule_id: SCH-012
   reason: ''
-  status: pending
-  makeup_date: null
-  makeup_schedule_id: null
+  status: fulfilled
+  makeup_date: '2026-08-03'
+  makeup_schedule_id: SCH-021
