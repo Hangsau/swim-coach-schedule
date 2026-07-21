@@ -285,15 +285,6 @@ schedules:
   slot_id: S7
   time: 15:20-16:20
   note: 補課（原 2026-07-17）
-- id: SCH-022
-  class_id: STU-14
-  specific_dates:
-  - '2026-08-18'
-  slot_id: S11
-  time: 18:00-19:00
-  note: 補課（原 2026-07-28）
-  except_dates:
-  - '2026-08-18'
 - id: SCH-023
   class_id: STU-14
   specific_dates:
@@ -339,7 +330,7 @@ makeups:
   reason: ''
   status: fulfilled
   makeup_date: '2026-08-18'
-  makeup_schedule_id: SCH-022
+  makeup_schedule_id: SCH-024
 - id: MU-005
   class_id: STU-14
   origin_date: '2026-07-30'
