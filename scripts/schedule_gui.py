@@ -30,7 +30,7 @@ RENDER = ROOT / "scripts" / "render_html.py"
 PAGES_URL = "https://hangsau.github.io/swim-coach-schedule/"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from query import DAY_NAMES, DAY_NAMES_ZH, expand_schedule, load as load_data  # noqa: E402
+from query import DAY_NAMES, expand_schedule, load as load_data  # noqa: E402
 
 # ---- 配色：沿用桌面看板 NOC 風（與 religions-history 刊版一致；蓄意複製、不跨 repo import）----
 BG    = "#15181c"
@@ -70,6 +70,17 @@ CHIP_COLORS = ["#3d5a80", "#5b8a52", "#8a6d3b", "#7a4b6b",
 
 def chip_color(class_id):
     return CHIP_COLORS[sum(map(ord, str(class_id))) % len(CHIP_COLORS)]
+
+
+def schema_error(data):
+    """檢查資料檔是否為 v4 形狀；可用回 None，否則回給教練看的導引文字。"""
+    if not isinstance(data, dict):
+        return "資料檔格式錯誤：頂層不是 mapping，請檢查 data/schedule.yaml"
+    sv = data.get("schema_version")
+    if sv != 4:
+        return (f"資料檔還是舊版（schema_version={sv}，需要 4）："
+                "請先執行 python scripts/migrate_v4.py 完成遷移再開啟")
+    return None
 
 
 def make_btn(parent, text, cmd, color=TRACK, fg=FG):
@@ -325,6 +336,22 @@ class ConfirmDialog(tk.Toplevel):
                          text=f"⚠ 有 {lost} 堂已上過的課會因此消失，請再確認日期",
                          bg=BG, fg=BAD, font=F_SMALL, anchor="w",
                          wraplength=600, justify="left").pack(fill="x")
+        reverted = resp_data.get("makeups_reverted") or []
+        if reverted:
+            tk.Label(
+                self,
+                text=(f"↺ 被刪除的課次原本用來銷帳："
+                      f"{', '.join(map(str, reverted))} 已自動回到待補"),
+                bg=BG, fg=PROG, font=F_SMALL, anchor="w",
+                wraplength=600, justify="left").pack(fill="x")
+        synced = resp_data.get("makeups_synced") or []
+        if synced:
+            tk.Label(
+                self,
+                text=(f"↺ 這堂是補課：{', '.join(map(str, synced))} "
+                      "的補課日已跟著更新"),
+                bg=BG, fg=PROG, font=F_SMALL, anchor="w",
+                wraplength=600, justify="left").pack(fill="x")
 
         for e in resp.get("errors") or []:
             tk.Label(self, text=f"錯誤 {e.get('code')}：{e.get('msg')}", bg=BG, fg=BAD,
@@ -459,16 +486,21 @@ class SwimTab(tk.Frame):
 
         def work():
             try:
+                data = load_data()
+                schema_msg = schema_error(data)
+                if schema_msg:
+                    self.after(0, lambda: self.sum_lbl.config(
+                        text=f"✘ {schema_msg}", fg=BAD))
+                    return
                 status = run_cli(["status"])
                 classes = run_cli(["list-classes", "--with-schedules"])
                 slots = run_cli(["list-slots"])
-                data = load_data()
                 slots_by_id = {s["id"]: s for s in data.get("slots") or []}
                 classes_by_id = {c["id"]: c for c in data.get("classes") or []}
                 raw_schedules = data.get("schedules") or []
                 raw_makeups = data.get("makeups") or []
                 lessons = expand_schedule(
-                    raw_schedules, slots_by_id, classes_by_id)
+                    raw_schedules, slots_by_id, classes_by_id, data=data)
                 g_dirty = run_cmd(["git", "status", "--porcelain"])
                 ahead = git_ahead()
                 self.after(0, lambda: self._render(
@@ -809,39 +841,32 @@ class SwimTab(tk.Frame):
             label=f"{lesson['date']}　{lesson['slot_time']}　{lesson['class_name']}",
             state="disabled")
         menu.add_separator()
-        menu.add_command(label="取消這天這堂（不補）",
+        menu.add_command(label="取消這堂（不補）",
                          command=lambda: self._form_then_run(
-                             "取消一堂", "cancel-lesson", [
-                                 {"flag": "--class", "label": "班級", "kind": "combo",
-                                  "values": self._class_values(), "value": cls_val,
-                                  "required": True},
-                                 {"flag": "--date", "label": "日期", "kind": "date",
-                                  "value": str(lesson["date"]), "required": True},
-                                 {"flag": "--reason", "label": "原因", "kind": "entry"},
-                             ]))
+                             "取消這堂", "cancel-lesson",
+                             self._fields_cancel_lesson(
+                                 class_value=cls_val,
+                                 date_value=str(lesson["date"]))))
+        menu.add_command(label="取消並登記待補（之後補）",
+                         command=lambda: self._form_then_run(
+                             "取消並登記待補", "cancel-lesson",
+                             self._fields_cancel_lesson(
+                                 class_value=cls_val,
+                                 date_value=str(lesson["date"]), makeup=True)))
         menu.add_command(label="挪到別天 / 換時段",
                          command=lambda: self._form_then_run(
-                             "挪課", "move-lesson", [
-                                 {"flag": "--class", "label": "班級", "kind": "combo",
-                                  "values": self._class_values(), "value": cls_val,
-                                  "required": True},
-                                 {"flag": "--from-date", "label": "原日期", "kind": "date",
-                                  "value": str(lesson["date"]), "required": True},
-                                 {"flag": "--to-date", "label": "新日期", "kind": "date",
-                                  "required": True, "hint": "YYYY-MM-DD"},
-                                 {"flag": "--to-slot", "label": "新時段（常用）",
-                                  "kind": "combo", "values": self._slot_values(),
-                                  "hint": "或改填下欄"},
-                                 {"flag": "--to-time", "label": "新時段（自訂）",
-                                  "kind": "entry", "hint": "HH:MM-HH:MM"},
-                                 {"flag": "--note", "label": "備註", "kind": "entry"},
-                             ]))
-        menu.add_command(label="這班從某天起換時段…",
-                         command=lambda: self._form_then_run(
-                             "換時段", "split-schedule",
-                             self._fields_split_schedule(
+                             "挪課", "move-lesson",
+                             self._fields_move_lesson(
                                  class_value=cls_val,
-                                 at_value=str(lesson["date"]))))
+                                 from_value=str(lesson["date"]))))
+        if lesson.get("schedule_id"):
+            menu.add_command(label="這班從某天起換時段…",
+                             command=lambda: self._form_then_run(
+                                 "換時段", "split-schedule",
+                                 self._fields_split_schedule(
+                                     class_value=cls_val,
+                                     at_value=str(lesson["date"]),
+                                     schedule_id_value=lesson["schedule_id"])))
         menu.add_command(label="這班臨時再加一堂",
                          command=lambda: self._form_then_run(
                              "加一堂", "add-lesson",
@@ -855,11 +880,15 @@ class SwimTab(tk.Frame):
                                      (c for c in self._classes
                                       if c["id"] == lesson["class_id"]),
                                      None))))
-        menu.add_command(label="刪除這條排課…",
-                         command=lambda: self._form_then_run(
-                             "刪除排課", "remove-schedule",
-                             self._fields_remove_schedule(
-                                 class_value=cls_val, day_value=lesson["day"])))
+        if lesson.get("schedule_id"):
+            menu.add_command(label="刪除這條排課…",
+                             command=lambda: self._form_then_run(
+                                 "刪除排課", "remove-schedule", [
+                                     {"flag": "--schedule-id", "label": "排課 ID",
+                                      "kind": "entry",
+                                      "value": lesson["schedule_id"],
+                                      "required": True},
+                                 ]))
         menu.add_command(label="結束此班（保留已上堂次）…",
                          command=lambda: self._form_then_run(
                              "結束班級", "end-class",
@@ -986,26 +1015,20 @@ class SwimTab(tk.Frame):
     # ---- 班級詳情視窗 ----
 
     def _fields_update_schedule(self, sched):
-        """預填現有排課欄位，給 update-schedule 表單用。"""
-        days_val = ",".join(sched.get("days") or []) if sched.get("days") else ""
+        """v4 schedule 只是分組 metadata；pattern 欄位留空供重排未來課次。"""
         return [
             {"flag": "--schedule-id", "label": "排課 ID", "kind": "entry",
              "value": sched.get("id", ""), "required": True},
-            {"flag": "--start", "label": "開始日", "kind": "date",
-             "value": str(sched.get("start_date") or "")},
+            {"flag": "--start", "label": "重排開始日", "kind": "date",
+             "hint": "要重排未來日期才填；只改時間請留空"},
             {"flag": "--end", "label": "結束日", "kind": "date",
-             "value": str(sched.get("end_date") or ""),
              "hint": "與週數/總堂數三擇一，改別欄請清空此欄"},
             {"flag": "--weeks", "label": "持續週數", "kind": "entry",
-             "value": str(sched.get("duration_weeks") or ""),
              "hint": "與結束日/總堂數三擇一"},
-            {"flag": "--lessons", "label": "總堂數", "kind": "entry",
-             "value": str(sched.get("total_lessons") or "")},
+            {"flag": "--lessons", "label": "總堂數", "kind": "entry"},
             {"flag": "--day", "label": "單一星期", "kind": "combo",
-             "values": DAY_NAMES,
-             "value": sched.get("day") or ""},
+             "values": DAY_NAMES},
             {"flag": "--days", "label": "多個星期", "kind": "entry",
-             "value": days_val,
              "hint": "多個星期：mon,tue（會取代單一星期）"},
             {"flag": "--slot", "label": "常用時段", "kind": "combo",
              "values": self._slot_values(),
@@ -1021,7 +1044,7 @@ class SwimTab(tk.Frame):
                 if m.get("class_id") == class_id
                 and m.get("status", "pending") == "pending"]
 
-    def _lesson_actions_menu(self, ev, c, lesson_date, sched, detail_win):
+    def _lesson_actions_menu(self, ev, c, lesson_date, detail_win):
         """單堂課的操作選單：取消（不補 / 登記待補）、挪天、只改時間。"""
         cls_val = f"{c['id']}{SEP}{c.get('name') or ''}"
         dstr = str(lesson_date)
@@ -1100,19 +1123,9 @@ class SwimTab(tk.Frame):
         finally:
             menu.grab_release()
 
-    def _render_lesson_chips(self, win, c, sched, future, today_d):
-        """在排課列底下鋪出未來各堂日期 chip，點一個開單堂操作選單；
-        已取消（except_dates）的未來日期以灰字標示。"""
-        cancelled = []
-        for ex in sched.get("except_dates") or []:
-            try:
-                exd = date.fromisoformat(str(ex))
-            except (ValueError, TypeError):
-                continue
-            if exd >= today_d:
-                cancelled.append(exd)
-
-        if not future and not cancelled:
+    def _render_lesson_chips(self, win, c, future):
+        """在排課列底下鋪出實際存在的未來課次，點一個開操作選單。"""
+        if not future:
             return
 
         wrap = tk.Frame(win, bg=BG)
@@ -1127,11 +1140,8 @@ class SwimTab(tk.Frame):
                             font=F_SMALL, padx=6, pady=2)
             chip.pack(side="left", padx=2, pady=2)
             chip.bind("<Button-1>",
-                      lambda ev, dd=ld, s=sched:
-                      self._lesson_actions_menu(ev, c, dd, s, win))
-        for exd in cancelled:
-            tk.Label(wrap, text=f"{exd.month}/{exd.day} 已取消", bg=BG, fg=MUTED,
-                     font=F_SMALL, padx=6, pady=2).pack(side="left", padx=2)
+                      lambda ev, dd=ld:
+                      self._lesson_actions_menu(ev, c, dd, win))
 
     def _class_detail(self, c):
         """班級詳情視窗：顯示班級資訊 + 排課列表，底部提供班級操作按鈕。"""
@@ -1197,44 +1207,30 @@ class SwimTab(tk.Frame):
                      anchor="w").pack(fill="x", padx=4, pady=2)
         else:
             for sched in cls_scheds:
-                # 星期描述
-                if sched.get("specific_dates"):
-                    n_dates = len(sched["specific_dates"])
-                    day_txt = f"指定日期 {n_dates} 個"
-                elif sched.get("days"):
-                    day_txt = "、".join(
-                        DAY_NAMES_ZH.get(d, d) for d in sched["days"])
-                elif sched.get("day"):
-                    day_txt = DAY_NAMES_ZH.get(sched["day"], sched["day"])
-                else:
-                    day_txt = "—"
+                # v4 schedule 不再儲存 pattern；描述來自 label，日期來自 lessons。
+                label_txt = sched.get("label") or "排課"
 
                 # 時段
                 time_txt = sched.get("time") or "—"
 
-                # 起訖
-                start_txt = str(sched.get("start_date") or "—")
-                end_parts = []
-                if sched.get("end_date"):
-                    end_parts.append(f"～ {sched['end_date']}")
-                if sched.get("duration_weeks"):
-                    end_parts.append(f"（共 {sched['duration_weeks']} 週）")
-                if sched.get("total_lessons"):
-                    end_parts.append(f"（共 {sched['total_lessons']} 堂）")
-                range_txt = f"{start_txt} 起 {'　'.join(end_parts)}" if end_parts \
-                    else f"{start_txt} 起"
-
                 # 已上 / 未來
                 sched_lessons = [l for l in self._all_lessons
                                  if l.get("schedule_id") == sched.get("id")]
+                sched_lessons.sort(key=lambda l: (l["date"], l.get("slot_time", "")))
                 past = [l for l in sched_lessons if l["date"] < today_d]
-                future = sorted([l for l in sched_lessons if l["date"] >= today_d],
-                                key=lambda l: l["date"])
+                future = [l for l in sched_lessons if l["date"] >= today_d]
                 counts_txt = f"已上 {len(past)}／未來 {len(future)}"
+                if sched_lessons:
+                    first_date = sched_lessons[0]["date"]
+                    last_date = sched_lessons[-1]["date"]
+                    range_txt = (str(first_date) if first_date == last_date else
+                                 f"{first_date} ～ {last_date}")
+                else:
+                    range_txt = "無課次"
 
                 line = "　".join(filter(None, [
                     sched.get("id", ""),
-                    day_txt,
+                    label_txt,
                     time_txt,
                     range_txt,
                     counts_txt,
@@ -1249,7 +1245,21 @@ class SwimTab(tk.Frame):
                          lambda ev, s=sched: self._schedule_menu(ev, c, s, win))
 
                 # 未來各堂日期 chip（點單堂可取消／挪天／改時間）
-                self._render_lesson_chips(win, c, sched, future, today_d)
+                self._render_lesson_chips(win, c, future)
+
+        standalone = sorted(
+            [l for l in self._all_lessons
+             if l.get("class_id") == c["id"] and not l.get("schedule_id")],
+            key=lambda l: (l["date"], l.get("slot_time", "")))
+        standalone_future = [l for l in standalone if l["date"] >= today_d]
+        if standalone:
+            tk.Label(
+                win,
+                text=(f"獨立課次（已上 {len(standalone) - len(standalone_future)}／"
+                      f"未來 {len(standalone_future)}）"),
+                bg=BG, fg=FG, font=(FONT, 10, "bold"), anchor="w").pack(
+                    fill="x", pady=(8, 2))
+            self._render_lesson_chips(win, c, standalone_future)
 
         # --- 底部班級操作按鈕 ---
         sep = tk.Frame(win, bg=TRACK, height=1)

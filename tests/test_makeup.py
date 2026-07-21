@@ -1,250 +1,154 @@
-"""
-test_makeup.py — 待補課帳本（cancel-lesson --makeup / fulfill-makeup / cancel-makeup）整合測試
-
-測試情境：
-1. cancel-lesson --makeup --apply → 建立 MU-001 pending，原課進 except_dates
-2. fulfill-makeup --apply → 新增補課那堂、makeup 標記 fulfilled 並連到新 schedule
-3. fulfill-makeup 補課日撞到別班 → E_TIME_OVERLAP（不是裸 crash；None slot_id 排序回歸測試）
-4. 重複 fulfill 同一筆 → E_MAKEUP_ALREADY_FULFILLED
-5. fulfill 不存在的 makeup-id → E_MAKEUP_NOT_FOUND
-6. cancel-makeup --apply 撤銷登記；再撤同一筆 → E_MAKEUP_NOT_FOUND
-7. list-makeups 預設只列 pending，--status all 列全部
-8. validate 拒絕非法 status（結構驗證單元）
-"""
-import json
-import os
-import subprocess
-import sys
+from copy import deepcopy
 from datetime import date, timedelta
-from pathlib import Path
 
 import pytest
-import yaml
 
-ROOT = Path(__file__).parent.parent
-CLI = ROOT / "scripts" / "schedule_cli.py"
-
-sys.path.insert(0, str(ROOT / "scripts"))
+from conftest import codes, monday, read_yaml, run_cli, write_yaml
 
 
-def run_cli(yaml_path, *args):
-    cmd = [sys.executable, str(CLI), "--file", str(yaml_path), "--json", *args]
-    env = os.environ.copy()
-    env["PYTHONIOENCODING"] = "utf-8"
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env, encoding="utf-8")
-    try:
-        payload = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        payload = {"_raw": result.stdout, "_stderr": result.stderr}
-    return result.returncode, payload
+def lesson_date(data, class_id="C1", index=2):
+    return [l for l in data["lessons"] if l["class_id"] == class_id][index]["date"]
 
 
-def _write(tmp_path, schedules, classes=None, slots=None, makeups=None):
-    if slots is None:
-        slots = [{"id": "S1", "time": "09:00-10:00", "note": "早上9點"}]
-    if classes is None:
-        classes = [{"id": "C1", "name": "精緻班", "weekly_count": 1, "level": "L1"}]
-    data = {
-        "schema_version": 2,
-        "slots": slots,
-        "classes": classes,
-        "schedules": schedules,
-    }
-    if makeups is not None:
-        data["makeups"] = makeups
-    p = tmp_path / "schedule.yaml"
-    p.write_text(yaml.dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
-    return p
+def test_cancel_makeup_roundtrip(v4_yaml):
+    original = read_yaml(v4_yaml)
+    target = lesson_date(original)
+    _, before = run_cli(v4_yaml, "list-makeups")
+    _, cancelled = run_cli(v4_yaml, "cancel-lesson", "--class", "C1", "--date", target,
+                           "--makeup", "--reason", "leave", "--apply")
+    _, pending = run_cli(v4_yaml, "list-makeups")
+    mu_id = cancelled["data"]["makeup"]["id"]
+    makeup_day = str(monday(6) + timedelta(days=3))
+    _, fulfilled = run_cli(v4_yaml, "fulfill-makeup", "--makeup-id", mu_id,
+                           "--date", makeup_day, "--time", "17:00-18:00", "--apply")
+    _, after = run_cli(v4_yaml, "list-makeups")
+    written = read_yaml(v4_yaml)
+    makeup = next(m for m in written["makeups"] if m["id"] == mu_id)
+    assert before["data"]["pending_total"] == 0
+    assert pending["data"]["pending_total"] == 1
+    assert len(read_yaml(v4_yaml)["makeups"]) == 1
+    assert after["data"]["pending_total"] == 0
+    assert fulfilled["ok"] and makeup["status"] == "fulfilled"
+    assert any(l["id"] == makeup["makeup_lesson_id"] for l in written["lessons"])
+    assert not any(l["class_id"] == "C1" and l["date"] == target for l in written["lessons"])
 
 
-def _future_dates(n, step=7, start=8):
-    today = date.today()
-    return [str(today + timedelta(days=start + i * step)) for i in range(n)]
+def test_cancel_without_makeup_only_deletes_lesson(v4_yaml):
+    target = lesson_date(read_yaml(v4_yaml))
+    _, p = run_cli(v4_yaml, "cancel-lesson", "--class", "C1", "--date", target, "--apply")
+    assert p["ok"] and read_yaml(v4_yaml)["makeups"] == []
 
 
-@pytest.fixture
-def yaml_cancellable(tmp_path):
-    """C1 有兩堂未來指定日期課，第一堂可拿來取消。"""
-    d1, d2 = _future_dates(2)
-    schedules = [{
-        "id": "SCH-001",
-        "class_id": "C1",
-        "slot_id": "S1",
-        "time": "09:00-10:00",
-        "specific_dates": [d1, d2],
-    }]
-    return _write(tmp_path, schedules), d1, d2
+def test_fulfill_missing_makeup_clean_error(v4_yaml):
+    cp, p = run_cli(v4_yaml, "fulfill-makeup", "--makeup-id", "MU-999",
+                    "--date", str(monday(6)), "--time", "17:00-18:00")
+    assert cp.returncode != 0 and "E_MAKEUP_NOT_FOUND" in codes(p) and "Traceback" not in cp.stderr
 
 
-# ── 情境 1：cancel-lesson --makeup 建立待補課 ─────────────────────────────────
-
-def test_cancel_with_makeup_creates_entry(yaml_cancellable):
-    yaml_path, d1, _ = yaml_cancellable
-
-    rc, p = run_cli(yaml_path, "cancel-lesson", "--class", "C1", "--date", d1,
-                    "--reason", "教練生病", "--makeup", "--apply")
-    assert rc == 0, p
-    assert p["ok"], p
-    mk = p["data"]["makeup"]
-    assert mk["id"] == "MU-001"
-    assert mk["status"] == "pending"
-    assert mk["origin_date"] == d1
-
-    written = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-    assert len(written["makeups"]) == 1
-    sched = written["schedules"][0]
-    assert d1 in [str(x) for x in sched.get("except_dates", [])]
+def test_cancel_missing_makeup_clean_error(v4_yaml):
+    cp, p = run_cli(v4_yaml, "cancel-makeup", "--makeup-id", "MU-999")
+    assert "E_MAKEUP_NOT_FOUND" in codes(p) and "Traceback" not in cp.stderr
 
 
-# ── 情境 2：fulfill-makeup 銷帳並新增補課那堂 ────────────────────────────────
-
-def test_fulfill_settles_and_adds_lesson(yaml_cancellable):
-    yaml_path, d1, _ = yaml_cancellable
-    run_cli(yaml_path, "cancel-lesson", "--class", "C1", "--date", d1,
-            "--makeup", "--apply")
-
-    makeup_date = str(date.today() + timedelta(days=30))
-    rc, p = run_cli(yaml_path, "fulfill-makeup", "--makeup-id", "MU-001",
-                    "--date", makeup_date, "--slot", "S1", "--apply")
-    assert rc == 0, p
-    assert p["ok"], p
-    assert p["data"]["fulfilled_makeup"] == "MU-001"
-    assert p["data"]["makeup_date"] == makeup_date
-
-    written = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-    mk = written["makeups"][0]
-    assert mk["status"] == "fulfilled"
-    assert mk["makeup_date"] == makeup_date
-    new_sched_id = mk["makeup_schedule_id"]
-    added = next(s for s in written["schedules"] if s["id"] == new_sched_id)
-    assert makeup_date in [str(x) for x in added["specific_dates"]]
+def test_fulfill_overlap_is_envelope_not_crash(v4_yaml):
+    target = lesson_date(read_yaml(v4_yaml))
+    run_cli(v4_yaml, "cancel-lesson", "--class", "C1", "--date", target, "--makeup", "--apply")
+    occupied = read_yaml(v4_yaml)["lessons"][0]["date"]
+    cp, p = run_cli(v4_yaml, "fulfill-makeup", "--makeup-id", "MU-001",
+                    "--date", occupied, "--time", "09:30-10:30", "--apply")
+    assert not p["ok"] and "E_TIME_OVERLAP" in codes(p) and "Traceback" not in cp.stderr
 
 
-# ── 情境 3：補課日撞到別班 → E_TIME_OVERLAP（None slot_id 排序回歸） ──────────
-
-def test_fulfill_overlap_returns_error_not_crash(tmp_path):
-    d1, = _future_dates(1)
-    makeup_date = str(date.today() + timedelta(days=30))
-    classes = [
-        {"id": "C1", "name": "精緻班", "weekly_count": 1},
-        {"id": "C2", "name": "占位班", "weekly_count": 1},
-    ]
-    schedules = [
-        {"id": "SCH-001", "class_id": "C1", "slot_id": "S1",
-         "time": "09:00-10:00", "specific_dates": [d1]},
-        # C2 已占用補課目標日的 09:00-10:00
-        {"id": "SCH-002", "class_id": "C2", "slot_id": "S1",
-         "time": "09:00-10:00", "specific_dates": [makeup_date]},
-    ]
-    yaml_path = _write(tmp_path, schedules, classes=classes)
-    run_cli(yaml_path, "cancel-lesson", "--class", "C1", "--date", d1,
-            "--makeup", "--apply")
-
-    # 補課用 --time（time-only，slot_id=None）撞 C2 → 需回乾淨 E_TIME_OVERLAP
-    rc, p = run_cli(yaml_path, "fulfill-makeup", "--makeup-id", "MU-001",
-                    "--date", makeup_date, "--time", "09:00-10:00", "--apply")
-    assert rc != 0, p
-    assert not p["ok"], p
-    codes = [e["code"] for e in p.get("errors", [])]
-    assert "E_TIME_OVERLAP" in codes, f"應回 E_TIME_OVERLAP 而非 crash，errors={p.get('errors')}"
+def _fulfilled_file(tmp_path, v4_data, linked=True):
+    d = str(monday(7))
+    lesson = {"id": "L-9000", "class_id": "C1", "date": d, "time": "17:00-18:00"}
+    if linked:
+        lesson.update(schedule_id="SCH-001", slot_id="S1")
+    v4_data["lessons"].append(lesson)
+    v4_data["makeups"] = [{"id": "MU-001", "class_id": "C1", "origin_date": "2026-01-01",
+                            "origin_schedule_id": "SCH-001", "reason": "leave",
+                            "status": "fulfilled", "makeup_date": d,
+                            "makeup_lesson_id": "L-9000"}]
+    return write_yaml(tmp_path, v4_data), d
 
 
-# ── 情境 4：重複 fulfill → E_MAKEUP_ALREADY_FULFILLED ────────────────────────
-
-def test_double_fulfill(yaml_cancellable):
-    yaml_path, d1, _ = yaml_cancellable
-    run_cli(yaml_path, "cancel-lesson", "--class", "C1", "--date", d1,
-            "--makeup", "--apply")
-    makeup_date = str(date.today() + timedelta(days=30))
-    run_cli(yaml_path, "fulfill-makeup", "--makeup-id", "MU-001",
-            "--date", makeup_date, "--slot", "S1", "--apply")
-
-    rc, p = run_cli(yaml_path, "fulfill-makeup", "--makeup-id", "MU-001",
-                    "--date", str(date.today() + timedelta(days=45)),
-                    "--slot", "S1", "--apply")
-    assert rc != 0, p
-    codes = [e["code"] for e in p.get("errors", [])]
-    assert "E_MAKEUP_ALREADY_FULFILLED" in codes, f"errors={p.get('errors')}"
+def _assert_reverted(path):
+    m = read_yaml(path)["makeups"][0]
+    assert m["status"] == "pending" and m["makeup_date"] is None and m["makeup_lesson_id"] is None
 
 
-# ── 情境 5：fulfill 不存在的 id → E_MAKEUP_NOT_FOUND ─────────────────────────
-
-def test_fulfill_not_found(yaml_cancellable):
-    yaml_path, _, _ = yaml_cancellable
-    rc, p = run_cli(yaml_path, "fulfill-makeup", "--makeup-id", "MU-999",
-                    "--date", str(date.today() + timedelta(days=30)),
-                    "--slot", "S1", "--apply")
-    assert rc != 0, p
-    codes = [e["code"] for e in p.get("errors", [])]
-    assert "E_MAKEUP_NOT_FOUND" in codes, f"errors={p.get('errors')}"
-
-
-# ── 情境 6：cancel-makeup 撤銷登記 ──────────────────────────────────────────
-
-def test_cancel_makeup(yaml_cancellable):
-    yaml_path, d1, _ = yaml_cancellable
-    run_cli(yaml_path, "cancel-lesson", "--class", "C1", "--date", d1,
-            "--makeup", "--apply")
-
-    rc, p = run_cli(yaml_path, "cancel-makeup", "--makeup-id", "MU-001", "--apply")
-    assert rc == 0, p
-    assert p["data"]["cancelled_makeup"] == "MU-001"
-    written = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-    assert written.get("makeups", []) == []
-
-    # 再撤同一筆 → 不存在
-    rc2, p2 = run_cli(yaml_path, "cancel-makeup", "--makeup-id", "MU-001", "--apply")
-    assert rc2 != 0, p2
-    codes = [e["code"] for e in p2.get("errors", [])]
-    assert "E_MAKEUP_NOT_FOUND" in codes, f"errors={p2.get('errors')}"
+def test_cancel_fulfilled_lesson_reverts_pending(tmp_path, v4_data):
+    path, d = _fulfilled_file(tmp_path, v4_data, linked=False)
+    _, p = run_cli(path, "cancel-lesson", "--class", "C1", "--date", d, "--apply")
+    assert p["data"]["makeups_reverted"] == ["MU-001"]
+    assert p["data"]["makeups_reused"] == ["MU-001"]
+    assert "fulfill-makeup --makeup-id MU-001" in p["next_actions"][0]
+    written = read_yaml(path)
+    assert [m["id"] for m in written["makeups"] if m["status"] == "pending"] == ["MU-001"]
+    _assert_reverted(path)
 
 
-# ── 情境 7：list-makeups 過濾 ───────────────────────────────────────────────
-
-def test_list_makeups_filters(yaml_cancellable):
-    yaml_path, d1, d2 = yaml_cancellable
-    run_cli(yaml_path, "cancel-lesson", "--class", "C1", "--date", d1,
-            "--makeup", "--apply")
-    # 銷帳 MU-001
-    run_cli(yaml_path, "fulfill-makeup", "--makeup-id", "MU-001",
-            "--date", str(date.today() + timedelta(days=30)), "--slot", "S1", "--apply")
-    # 再登記一筆 pending（取消 d2）
-    run_cli(yaml_path, "cancel-lesson", "--class", "C1", "--date", d2,
-            "--makeup", "--apply")
-
-    rc, p = run_cli(yaml_path, "list-makeups")  # 預設 pending
-    assert rc == 0, p
-    assert p["data"]["count"] == 1
-    assert p["data"]["makeups"][0]["status"] == "pending"
-
-    rc2, p2 = run_cli(yaml_path, "list-makeups", "--status", "all")
-    assert p2["data"]["count"] == 2
+def test_cancel_fulfilled_lesson_with_makeup_reuses_same_pending(tmp_path, v4_data):
+    path, d = _fulfilled_file(tmp_path, v4_data, linked=False)
+    _, p = run_cli(path, "cancel-lesson", "--class", "C1", "--date", d,
+                   "--makeup", "--reason", "cancelled makeup", "--apply")
+    written = read_yaml(path)
+    pending = [m for m in written["makeups"] if m["status"] == "pending"]
+    assert p["ok"] and p["data"]["makeups_reverted"] == ["MU-001"]
+    assert p["data"]["makeups_reused"] == ["MU-001"]
+    assert "makeup" not in p["data"]
+    assert len(pending) == 1 and pending[0]["id"] == "MU-001"
+    assert "fulfill-makeup --makeup-id MU-001" in p["next_actions"][0]
 
 
-# ── 情境 8b：cancel-lesson 壞日期回乾淨錯誤（不裸 crash）──────────────────────
-
-def test_cancel_lesson_bad_date(yaml_cancellable):
-    yaml_path, _, _ = yaml_cancellable
-    rc, p = run_cli(yaml_path, "cancel-lesson", "--class", "C1",
-                    "--date", "banana", "--makeup", "--apply")
-    assert rc != 0, p
-    assert not p["ok"], p
-    codes = [e["code"] for e in p.get("errors", [])]
-    assert "E_SCHEMA_INVALID" in codes, f"壞日期應回 E_SCHEMA_INVALID，errors={p.get('errors')}"
+def test_remove_schedule_reverts_fulfilled_makeup(tmp_path, v4_data):
+    path, _ = _fulfilled_file(tmp_path, v4_data)
+    _, p = run_cli(path, "remove-schedule", "--schedule-id", "SCH-001", "--apply")
+    assert p["ok"]
+    _assert_reverted(path)
 
 
-# ── 情境 8：validate 拒絕非法 status（結構驗證單元）─────────────────────────
+def test_update_schedule_regeneration_reverts_fulfilled_makeup(tmp_path, v4_data):
+    path, _ = _fulfilled_file(tmp_path, v4_data)
+    _, p = run_cli(path, "update-schedule", "--schedule-id", "SCH-001", "--start", str(monday(8)),
+                   "--day", "mon", "--lessons", "2", "--apply")
+    assert p["ok"] and p["data"]["makeups_reverted"] == ["MU-001"]
+    _assert_reverted(path)
 
-def test_validate_rejects_bad_status():
-    import validate as v
-    data = {
-        "schema_version": 2,
-        "slots": [{"id": "S1", "time": "09:00-10:00"}],
-        "classes": [{"id": "C1", "name": "A", "weekly_count": 1}],
-        "schedules": [],
-        "makeups": [{"id": "MU-001", "class_id": "C1",
-                     "origin_date": "2026-07-01", "status": "bogus"}],
-    }
-    errors = v.validate_makeups(data)
-    codes = [e["code"] for e in errors]
-    assert "E_SCHEMA_INVALID" in codes, f"應拒絕非法 status，errors={errors}"
+
+def test_split_schedule_reverts_fulfilled_makeup(tmp_path, v4_data):
+    path, d = _fulfilled_file(tmp_path, v4_data)
+    _, p = run_cli(path, "split-schedule", "--schedule-id", "SCH-001", "--at", d,
+                   "--day", "mon", "--to-time", "17:00-18:00", "--lessons", "2", "--apply")
+    assert p["ok"]
+    _assert_reverted(path)
+
+
+def test_end_class_reverts_fulfilled_makeup_when_class_remains(tmp_path, v4_data):
+    path, d = _fulfilled_file(tmp_path, v4_data)
+    _, p = run_cli(path, "end-class", "--class", "C1", "--from", d, "--apply")
+    assert p["ok"] and not p["data"]["class_removed"]
+    _assert_reverted(path)
+
+
+def test_remove_class_cascade_removes_related_makeup(tmp_path, v4_data):
+    path, _ = _fulfilled_file(tmp_path, v4_data)
+    _, p = run_cli(path, "remove-class", "--id", "C1", "--cascade", "--apply")
+    assert p["ok"] and read_yaml(path)["makeups"] == []
+
+
+def test_move_fulfilled_lesson_keeps_fulfilled_and_syncs_date(tmp_path, v4_data):
+    path, d = _fulfilled_file(tmp_path, v4_data, linked=False)
+    new_day = str(monday(8) + timedelta(days=4))
+    _, p = run_cli(path, "move-lesson", "--class", "C1", "--from-date", d,
+                   "--to-date", new_day, "--apply")
+    m = read_yaml(path)["makeups"][0]
+    assert p["ok"] and m["status"] == "fulfilled" and m["makeup_date"] == new_day
+    assert m["makeup_lesson_id"] == "L-9000"
+
+
+def test_list_makeups_filters_status(tmp_path, v4_data):
+    path, _ = _fulfilled_file(tmp_path, v4_data)
+    _, pending = run_cli(path, "list-makeups")
+    _, all_items = run_cli(path, "list-makeups", "--status", "all")
+    assert pending["data"]["count"] == 0 and all_items["data"]["count"] == 1

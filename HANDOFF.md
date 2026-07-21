@@ -1,14 +1,24 @@
 # HANDOFF — swim-coach-schedule
 
 > 狀態快照（每次實質推進後更新）。行為規範見 `CLAUDE.md`，結構見 `MAP.md`。
-> `updated: 2026-07-11`
+> `updated: 2026-07-22`
 
 ## 現況
 
-- schema v3；slots S3–S11、班級 STU-01 起約 12 個、schedules 由 CLI 維護；新增 optional 頂層 `makeups`（待補課帳本）
-- CLI 19 個子命令（新增 end-class / undo / update-schedule / cancel-lesson --makeup / fulfill-makeup / list-makeups / cancel-makeup）；README 命令表已同步
+- schema v4；`lessons` 是唯一課次真相，`schedules` 只保留分組 metadata；現況 13 班、21 組排課、161 堂、2 筆 pending makeup
+- CLI 維持 19 個子命令與既有 JSON envelope；取消直接刪 lesson、挪課原地改 lesson、補課以 `makeup_lesson_id` 銷帳
 - CI（build.yml）：push main → strict validate + pytest + rebuild docs（drift 時 bot auto-commit）→ pages.yml 部署
 - 線上版：https://hangsau.github.io/swim-coach-schedule/
+
+## 本次（2026-07-22）：schema v4 明確課次模型
+
+- v3 pattern／負面日期模型已遷移為一堂一筆 `lessons`；真實資料遷移等價自檢 161 堂零差異，migration 冪等且使用同目錄暫存檔原子 replace
+- `query.py`、CLI、validate、GUI、render 全部改讀同一份 lessons；render 不再忽略呼叫端傳入的 data
+- `cancel-lesson` 直接刪課；`move-lesson` 原地改日期／時段並保留 L-id；`fulfill-makeup` 新增 standalone lesson
+- 已銷帳補課堂被刪除會讓原 MU 回 pending；再次帶 `--makeup` 取消不會重複欠兩筆
+- GUI 移除「已取消日期」概念，班級詳情顯示實際存在的課次，standalone lessons 也可操作
+- validate 拒絕未知 lesson 欄位；遷移只接受 v3、v4 重跑不動作，其他版本不寫檔
+- 測試由 69 增至 106，涵蓋遷移等價／冪等／中斷、欠補 roundtrip、刪補課回 pending、None-slot overlap、render data flow 與畸形輸入
 
 ## 本次（2026-07-10）：桌面編輯 GUI
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-schedule_cli.py — LLM-friendly CLI for swim-coach-schedule
+schedule_cli.py — LLM-friendly CLI for swim-coach-schedule（v4）
 
 設計目標：minimax LLM 經 TG 收到自然語言指令後，透過此 CLI 操作系統，
 不直接編輯 yaml。每個寫入命令：
@@ -8,6 +8,10 @@ schedule_cli.py — LLM-friendly CLI for swim-coach-schedule
   - 寫入前自動 validate；fail 拒絕並回 structured JSON
   - atomic write：先寫 temp + validate → 通過才 replace
   - JSON envelope: {"ok", "data", "errors", "warnings", "next_actions"}
+
+v4 語意：課次真相在頂層 lessons（一堂一筆），schedules 降級為分組
+metadata。add-schedule 當場展開成 N 筆 lessons；cancel-lesson 直接刪
+lesson；move-lesson 原地改 lesson 的 date/slot/time。
 
 子命令：
   status / list-classes / list-slots / list-conflicts
@@ -43,6 +47,11 @@ DEFAULT_YAML = ROOT / "data" / "schedule.yaml"
 sys.path.insert(0, str(Path(__file__).parent))
 from validate import validate_all, time_overlap, DAYS  # noqa: E402
 from query import DAY_NAMES, expand_schedule  # noqa: E402
+
+DAY_ZH_CHAR = {
+    "mon": "一", "tue": "二", "wed": "三", "thu": "四",
+    "fri": "五", "sat": "六", "sun": "日",
+}
 
 
 # -------------- envelope helpers --------------
@@ -154,6 +163,141 @@ def preview_diff(path, new_data):
     ))
 
 
+# -------------- v4 lesson helpers --------------
+
+def _parse_date_safe(d):
+    try:
+        return datetime.strptime(str(d), "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
+def _lesson_date(l):
+    return _parse_date_safe(l.get("date"))
+
+
+def _match_lessons(lessons, class_id, target_date):
+    """找 (class_id, date) 命中的 lessons"""
+    return [l for l in lessons
+            if l.get("class_id") == class_id and _lesson_date(l) == target_date]
+
+
+def _sort_lessons(lessons):
+    lessons.sort(key=lambda l: (str(l.get("date", "")), str(l.get("time", "")),
+                                str(l.get("id", ""))))
+
+
+def next_schedule_id(schedules):
+    existing = [str(s.get("id", "")) for s in schedules
+                if str(s.get("id", "")).startswith("SCH-")]
+    max_n = max([int(x.split("-")[1]) for x in existing
+                 if x.split("-")[1].isdigit()] + [0])
+    return f"SCH-{max_n + 1:03d}"
+
+
+def _alloc_lessons(numbering_source, dates, class_id, time_str,
+                   schedule_id=None, slot_id=None, note=None):
+    """為 dates 產生新 lessons；L-id 從 numbering_source（原始全量 lessons）
+    的最大號碼往後編，避免重用已刪 lesson 的 id。"""
+    nums = [int(m.group(1)) for l in numbering_source
+            if (m := re.match(r"^L-(\d+)$", str(l.get("id", ""))))]
+    n = max(nums, default=0)
+    new = []
+    for d in sorted(dates):
+        n += 1
+        lesson = {"id": f"L-{n:04d}"}
+        if schedule_id:
+            lesson["schedule_id"] = schedule_id
+        lesson["class_id"] = class_id
+        lesson["date"] = str(d)
+        lesson["time"] = time_str
+        if slot_id:
+            lesson["slot_id"] = slot_id
+        if note:
+            lesson["note"] = note
+        new.append(lesson)
+    return new
+
+
+def _revert_makeups_for_removed_lessons(new_data, removed_ids):
+    """被刪的 lessons 若是某筆 fulfilled makeup 的補課堂（makeup_lesson_id），
+    該 makeup 標回 pending（補課取消 → 欠補復活），避免懸空引用。回傳被還原的 makeup ids。"""
+    reverted = []
+    for m in new_data.get("makeups", []) or []:
+        if m.get("status") == "fulfilled" and m.get("makeup_lesson_id") in removed_ids:
+            m["status"] = "pending"
+            m["makeup_date"] = None
+            m["makeup_lesson_id"] = None
+            reverted.append(m.get("id"))
+    return reverted
+
+
+def make_label(day=None, days=None, specific=False):
+    """由 pattern 參數生成顯示用 label（同 migrate_v4.py 規則）"""
+    if specific:
+        return "指定日期"
+    if day:
+        return "週" + DAY_ZH_CHAR.get(day, "?")
+    if days:
+        chars = [DAY_ZH_CHAR.get(d, "?") for d in sorted(days, key=DAY_NAMES.index)]
+        return "週" + "".join(chars)
+    return None
+
+
+def expand_pattern_dates(day=None, days=None, specific_dates=None,
+                         start=None, end=None, weeks=None, total_lessons=None):
+    """pattern 參數 → 具體日期清單（date 物件，升冪）。
+
+    展開規則沿用 v3（migrate_v4.py 凍結副本同源）：
+      - specific_dates：直接列出
+      - day/days + start：週期展開；終止條件 end / weeks / total_lessons，
+        皆未給時預設 12 週
+    格式錯誤丟 ValueError（呼叫端轉 envelope error）。
+    """
+    out = []
+    if specific_dates:
+        for ds in specific_dates:
+            d = _parse_date_safe(ds)
+            if d is None:
+                raise ValueError(f"日期格式錯誤：{ds}（需 YYYY-MM-DD）")
+            out.append(d)
+        return sorted(out)
+    start_d = _parse_date_safe(start)
+    if start_d is None:
+        raise ValueError(f"start 日期格式錯誤：{start}（需 YYYY-MM-DD）")
+    max_lessons = total_lessons if total_lessons is not None else 99999
+    if end:
+        end_d = _parse_date_safe(end)
+        if end_d is None:
+            raise ValueError(f"end 日期格式錯誤：{end}（需 YYYY-MM-DD）")
+        end_d = end_d + timedelta(days=1)
+    elif weeks is not None:
+        end_d = start_d + timedelta(weeks=weeks)
+    elif total_lessons is not None:
+        end_d = start_d + timedelta(weeks=max_lessons + 52)
+    else:
+        end_d = start_d + timedelta(weeks=12)
+    if day:
+        target = DAY_NAMES.index(day)
+        days_ahead = (target - start_d.weekday()) % 7
+        current = start_d + timedelta(days=days_ahead)
+        count = 0
+        while current < end_d and count < max_lessons:
+            out.append(current)
+            count += 1
+            current += timedelta(days=7)
+    elif days:
+        target_set = {DAY_NAMES.index(d) for d in days}
+        current = start_d
+        count = 0
+        while current < end_d and count < max_lessons:
+            if current.weekday() in target_set:
+                out.append(current)
+                count += 1
+            current += timedelta(days=1)
+    return out
+
+
 # -------------- commands: read --------------
 
 def cmd_status(args):
@@ -161,7 +305,8 @@ def cmd_status(args):
     data = load_yaml(args.file)
     slots_by_id = {s["id"]: s for s in data.get("slots", []) if s.get("id")}
     classes_by_id = {c["id"]: c for c in data.get("classes", []) if c.get("id")}
-    lessons = expand_schedule(data.get("schedules", []) or [], slots_by_id, classes_by_id)
+    lessons = expand_schedule(data.get("schedules", []) or [], slots_by_id,
+                              classes_by_id, data=data)
     today = date.today()
     week_end = today + timedelta(days=7)
     upcoming = sorted(
@@ -182,7 +327,7 @@ def cmd_status(args):
     if not result["ok"]:
         next_actions.append("先跑 list-conflicts 看細節，依 error code 處理")
     if orphan_classes:
-        next_actions.append(f"孤兒 class（無 schedule）: {orphan_classes}；用 add-schedule 或 remove-class")
+        next_actions.append(f"孤兒 class（無任何課次）: {orphan_classes}；用 add-schedule / add-lesson 或 remove-class")
     if pending_makeups:
         next_actions.append(f"待補課 {len(pending_makeups)} 筆；補課日決定後用 fulfill-makeup 銷帳")
     env = envelope(
@@ -221,7 +366,8 @@ def cmd_list_slots(args):
     data = load_yaml(args.file)
     slots = data.get("slots", []) or []
     schedules = data.get("schedules", []) or []
-    used_set = {s.get("slot_id") for s in schedules}
+    lessons = data.get("lessons", []) or []
+    used_set = {s.get("slot_id") for s in schedules} | {l.get("slot_id") for l in lessons}
     info = [{"id": s["id"], "time": s.get("time"), "note": s.get("note"),
              "used": s["id"] in used_set} for s in slots if s.get("id")]
     if args.used_only:
@@ -347,23 +493,39 @@ def cmd_remove_class(args):
     if not cls:
         emit(envelope(False, errors=[_err("E_CLASS_NOT_FOUND", f"class {args.id} 不存在")]), args.json)
     schedules = data.get("schedules", []) or []
-    refs = [s for s in schedules if s.get("class_id") == args.id]
-    if refs and not args.cascade:
+    lessons = data.get("lessons", []) or []
+    makeups = data.get("makeups", []) or []
+    sched_refs = [s for s in schedules if s.get("class_id") == args.id]
+    lesson_refs = [l for l in lessons if l.get("class_id") == args.id]
+    makeup_refs = [m for m in makeups if m.get("class_id") == args.id]
+    if (sched_refs or lesson_refs) and not args.cascade:
         emit(envelope(False,
                       errors=[_err("E_AMBIGUOUS_TARGET",
-                                   f"class {args.id} 仍有 {len(refs)} 條 schedule 引用",
-                                   schedule_count=len(refs))],
-                      next_actions=["加 --cascade 連帶刪除 schedule，或先 remove-schedule"]),
+                                   f"class {args.id} 仍有 {len(sched_refs)} 條 schedule、"
+                                   f"{len(lesson_refs)} 筆 lesson 引用",
+                                   schedule_count=len(sched_refs),
+                                   lesson_count=len(lesson_refs))],
+                      next_actions=["加 --cascade 連帶刪除 schedule/lesson，或先 remove-schedule"]),
              args.json)
     new_data = copy.deepcopy(data)
     new_data["classes"] = [c for c in new_data["classes"] if c.get("id") != args.id]
     if args.cascade:
-        new_data["schedules"] = [s for s in new_data.get("schedules", []) if s.get("class_id") != args.id]
+        new_data["schedules"] = [s for s in new_data.get("schedules", []) or []
+                                 if s.get("class_id") != args.id]
+        new_data["lessons"] = [l for l in new_data.get("lessons", []) or []
+                               if l.get("class_id") != args.id]
+        if makeup_refs:
+            new_data["makeups"] = [m for m in new_data.get("makeups", []) or []
+                                   if m.get("class_id") != args.id]
     _commit_or_preview(args, new_data,
-                       {"removed_class_id": args.id, "cascaded_schedules": len(refs) if args.cascade else 0})
+                       {"removed_class_id": args.id,
+                        "cascaded_schedules": len(sched_refs) if args.cascade else 0,
+                        "cascaded_lessons": len(lesson_refs) if args.cascade else 0,
+                        "cascaded_makeups": len(makeup_refs) if args.cascade else 0})
 
 
 def cmd_add_schedule(args):
+    """新增排程：pattern 旗標當場展開成 N 筆 lessons + 1 筆 schedule metadata"""
     data = load_yaml(args.file)
     classes = data.get("classes", []) or []
     slots = data.get("slots", []) or []
@@ -391,54 +553,95 @@ def cmd_add_schedule(args):
                       errors=[_err("E_SCHEMA_INVALID",
                                    "day / days / specific-dates 必須恰指定一個")]),
              args.json)
-    # 自動賦予 schedule id
-    existing_ids = [s.get("id", "") for s in data.get("schedules", []) if s.get("id", "").startswith("SCH-")]
-    max_n = max([int(x.split("-")[1]) for x in existing_ids if x.split("-")[1].isdigit()] + [0])
-    new_id = f"SCH-{max_n + 1:03d}"
+    # 星期值驗證（v4 當場展開，壞值必須先擋）
+    day = args.day
+    days = _parse_days(args.days) if args.days else None
+    bad_days = []
+    if day and day not in DAY_NAMES:
+        bad_days = [day]
+    elif days:
+        bad_days = [d for d in days if d not in DAY_NAMES]
+    if bad_days:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   f"不合法的星期值：{','.join(bad_days)}",
+                                   allowed=list(DAY_NAMES))]),
+             args.json)
+    if (day or days) and not args.start:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   "day / days 模式需要 --start YYYY-MM-DD")]),
+             args.json)
+    specific = _parse_specific_dates(args.specific_dates) if args.specific_dates else None
+    # 展開日期
+    try:
+        dates = expand_pattern_dates(day=day, days=days, specific_dates=specific,
+                                     start=args.start, end=args.end,
+                                     weeks=args.weeks, total_lessons=args.lessons)
+    except ValueError as e:
+        emit(envelope(False, errors=[_err("E_SCHEMA_INVALID", str(e))]), args.json)
+    if not dates:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   "展開結果為 0 堂，請檢查 pattern 參數")]),
+             args.json)
+    # schedule metadata（v4：不存 pattern 欄位）
+    new_id = next_schedule_id(data.get("schedules", []) or [])
     new_sched = {"id": new_id, "class_id": args.class_id}
     if args.slot_id:
         new_sched["slot_id"] = args.slot_id
-    # time 凍結值：優先 --time，否則從 slot 抄
     if args.time:
         new_sched["time"] = args.time
     elif args.slot_id:
         slot_def = next(s for s in slots if s.get("id") == args.slot_id)
         new_sched["time"] = slot_def.get("time")
-    if args.start:
-        new_sched["start_date"] = args.start
-    if args.day:
-        new_sched["day"] = args.day
-    elif args.days:
-        new_sched["days"] = _parse_days(args.days)
-    elif args.specific_dates:
-        new_sched["specific_dates"] = _parse_specific_dates(args.specific_dates)
-    if args.weeks is not None:
-        new_sched["duration_weeks"] = args.weeks
-    if args.end:
-        new_sched["end_date"] = args.end
-    if args.lessons is not None:
-        new_sched["total_lessons"] = args.lessons
+    label = make_label(day=day, days=days, specific=bool(specific))
+    if label:
+        new_sched["label"] = label
     if args.note:
         new_sched["note"] = args.note
     new_data = copy.deepcopy(data)
     new_data.setdefault("schedules", []).append(new_sched)
-    _commit_or_preview(args, new_data, {"added_schedule": new_sched})
+    new_lessons = _alloc_lessons(data.get("lessons", []) or [], dates,
+                                 class_id=args.class_id,
+                                 time_str=new_sched.get("time"),
+                                 schedule_id=new_id,
+                                 slot_id=args.slot_id,
+                                 note=args.note)
+    new_data.setdefault("lessons", []).extend(new_lessons)
+    _sort_lessons(new_data["lessons"])
+    extra = []
+    if (day or days) and args.weeks is None and args.end is None and args.lessons is None:
+        extra.append("未指定 --weeks/--end/--lessons，預設展開 12 週")
+    _commit_or_preview(args, new_data,
+                       {"added_schedule": new_sched,
+                        "lessons_added": len(new_lessons),
+                        "lesson_dates": [str(d) for d in dates]},
+                       next_actions=extra or None)
 
 
 def cmd_move_lesson(args):
-    """挪一堂課：在原 schedule 加 except_dates 排除原日 + 新增 specific_dates 補課條目"""
+    """挪一堂課：原地改該筆 lesson 的 date/slot/time（不刪不增，無空殼）"""
     data = load_yaml(args.file)
-    schedules = data.get("schedules", []) or []
+    lessons = data.get("lessons", []) or []
     slots_by_id = {s["id"]: s for s in data.get("slots", []) if s.get("id")}
-    classes_by_id = {c["id"]: c for c in data.get("classes", []) if c.get("id")}
-    # 找命中該 (class, from_date) 的 schedule（透過 expand 確認原日真的有課）
-    lessons = expand_schedule(schedules, slots_by_id, classes_by_id)
-    from_date = datetime.strptime(args.from_date, "%Y-%m-%d").date()
-    matched = [l for l in lessons if l["class_id"] == args.class_id and l["date"] == from_date]
-    if not matched:
+    from_date = _parse_date_safe(args.from_date)
+    if from_date is None:
         emit(envelope(False,
                       errors=[_err("E_SCHEMA_INVALID",
-                                   f"class {args.class_id} 在 {args.from_date} 沒有原本的課")]),
+                                   f"日期格式錯誤：{args.from_date}（需 YYYY-MM-DD）")]),
+             args.json)
+    to_date = _parse_date_safe(args.to_date)
+    if to_date is None:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   f"日期格式錯誤：{args.to_date}（需 YYYY-MM-DD）")]),
+             args.json)
+    matched = _match_lessons(lessons, args.class_id, from_date)
+    if not matched:
+        emit(envelope(False,
+                      errors=[_err("E_LESSON_NOT_FOUND",
+                                   f"class {args.class_id} 在 {args.from_date} 沒有課可挪")]),
              args.json)
     if len(matched) > 1:
         emit(envelope(False,
@@ -446,235 +649,273 @@ def cmd_move_lesson(args):
                                    f"{args.class_id} {args.from_date} 同日有 {len(matched)} 堂",
                                    matches=matched)]),
              args.json)
-    src = matched[0]
-    src_sched_id = src.get("schedule_id")
-    if not src_sched_id:
+    if args.to_slot and args.to_slot not in slots_by_id:
         emit(envelope(False,
-                      errors=[_err("E_SCHEMA_INVALID",
-                                   "原 schedule 沒有 id（需要 migration）")]),
+                      errors=[_err("E_SLOT_NOT_FOUND", f"slot {args.to_slot} 不存在")]),
              args.json)
+    src = matched[0]
     new_data = copy.deepcopy(data)
-    # 在原 schedule 加 except_dates
-    for s in new_data["schedules"]:
-        if s.get("id") == src_sched_id:
-            ed = [str(x) for x in (s.get("except_dates") or [])]
-            ed.append(args.from_date)
-            s["except_dates"] = sorted(ed)
-            break
-    # 新增 specific_dates 補課條目
-    existing_ids = [s.get("id", "") for s in new_data["schedules"] if s.get("id", "").startswith("SCH-")]
-    max_n = max([int(x.split("-")[1]) for x in existing_ids if x.split("-")[1].isdigit()] + [0])
-    makeup = {
-        "id": f"SCH-{max_n + 1:03d}",
-        "class_id": args.class_id,
-        "specific_dates": [args.to_date],
-    }
+    target = next(l for l in new_data["lessons"] if l.get("id") == src.get("id"))
+    target["date"] = args.to_date
     if args.to_time:
-        makeup["time"] = args.to_time
+        target["time"] = args.to_time
+        target.pop("slot_id", None)
     elif args.to_slot:
-        slot = slots_by_id.get(args.to_slot)
-        if not slot:
-            emit(envelope(False,
-                          errors=[_err("E_SLOT_NOT_FOUND", f"slot {args.to_slot} 不存在")]),
-                 args.json)
-        makeup["slot_id"] = args.to_slot
-        makeup["time"] = slot.get("time")
-    else:
-        # 同時段移到別日
-        makeup["time"] = src.get("slot_time")
-        if src.get("slot_id"):
-            makeup["slot_id"] = src.get("slot_id")
+        target["slot_id"] = args.to_slot
+        target["time"] = slots_by_id[args.to_slot].get("time")
+    # 不給 to-slot / to-time：同時段挪到別天（time/slot 不動）
     if args.note:
-        makeup["note"] = args.note
-    new_data["schedules"].append(makeup)
-    _commit_or_preview(args, new_data,
-                       {"moved_from": {"date": args.from_date, "schedule_id": src_sched_id},
-                        "moved_to": makeup})
+        target["note"] = args.note
+    # 若這堂是某筆 fulfilled makeup 的補課堂，makeup_date 跟著挪
+    makeups_synced = []
+    for m in new_data.get("makeups", []) or []:
+        if m.get("status") == "fulfilled" and m.get("makeup_lesson_id") == src.get("id"):
+            m["makeup_date"] = args.to_date
+            makeups_synced.append(m.get("id"))
+    _sort_lessons(new_data["lessons"])
+    success = {"moved_lesson_id": src.get("id"),
+               "moved_from": {"date": args.from_date,
+                              "schedule_id": src.get("schedule_id")},
+               "moved_to": target}
+    if makeups_synced:
+        success["makeups_synced"] = makeups_synced
+    _commit_or_preview(args, new_data, success)
 
 
 def cmd_split_schedule(args):
-    """切某條 schedule：在某日截斷 + 新建後段。過去不動。"""
+    """切某條 schedule：from 起的未來 lessons 刪除，依新時段重生為後段新 schedule"""
     data = load_yaml(args.file)
     schedules = data.get("schedules", []) or []
     slots_by_id = {s["id"]: s for s in data.get("slots", []) if s.get("id")}
-    at_date = datetime.strptime(args.at, "%Y-%m-%d").date()
+    at_date = _parse_date_safe(args.at)
+    if at_date is None:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   f"--at {args.at} 不是合法 YYYY-MM-DD")]),
+             args.json)
 
     # 找 schedule
     target = None
     if args.schedule_id:
         target = next((s for s in schedules if s.get("id") == args.schedule_id), None)
+        if target is None:
+            emit(envelope(False,
+                          errors=[_err("E_SCHEDULE_NOT_FOUND",
+                                       f"schedule {args.schedule_id} 不存在",
+                                       available=[s.get("id") for s in schedules if s.get("id")])]),
+                 args.json)
     else:
-        cands = [s for s in schedules if s.get("class_id") == args.class_id
-                 and ("day" in s or "days" in s)]  # specific_dates 不適用 split
+        cands = [s for s in schedules if s.get("class_id") == args.class_id]
         if not cands:
             emit(envelope(False,
                           errors=[_err("E_SCHEMA_INVALID",
-                                       f"class {args.class_id} 沒有可 split 的 schedule（只支援 day/days mode）")]),
+                                       f"class {args.class_id} 沒有可 split 的 schedule")]),
                  args.json)
         if len(cands) > 1:
             emit(envelope(False,
                           errors=[_err("E_AMBIGUOUS_TARGET",
-                                       f"class {args.class_id} 有 {len(cands)} 條 day/days schedule",
+                                       f"class {args.class_id} 有 {len(cands)} 條 schedule",
                                        matches=[{"id": c.get("id"),
-                                                 "day": c.get("day"),
-                                                 "days": c.get("days")} for c in cands])],
+                                                 "label": c.get("label"),
+                                                 "time": c.get("time")} for c in cands])],
                           next_actions=["改用 --schedule-id 指定（例：SCH-005）"]),
                  args.json)
         target = cands[0]
-    if target is None:
-        emit(envelope(False, errors=[_err("E_SCHEMA_INVALID", "找不到目標 schedule")]), args.json)
-    if "specific_dates" in target:
-        emit(envelope(False,
-                      errors=[_err("E_SCHEMA_INVALID",
-                                   "specific_dates 模式不可 split（直接 remove + add）")]),
-             args.json)
 
-    new_data = copy.deepcopy(data)
-    # 在新版找對應條目
-    new_target = next(s for s in new_data["schedules"] if s.get("id") == target.get("id"))
+    sid = target.get("id")
+    all_lessons = data.get("lessons", []) or []
+    sched_lessons = [l for l in all_lessons if l.get("schedule_id") == sid]
+    kept = [l for l in sched_lessons
+            if (_lesson_date(l) is not None and _lesson_date(l) < at_date)]
+    removed = [l for l in sched_lessons
+               if (_lesson_date(l) is not None and _lesson_date(l) >= at_date)]
 
-    cutoff = at_date - timedelta(days=1)  # 前段最後一天
-    new_target["end_date"] = str(cutoff)
-    # 移除其他終止條件（避免衝突）
-    new_target.pop("duration_weeks", None)
-    new_target.pop("total_lessons", None)
+    # 後段 day/days：args 優先；沒指定就從被移除的未來 lessons 推導星期
+    if args.day or args.days:
+        day = args.day
+        days = _parse_days(args.days) if args.days else None
+        bad = [day] if (day and day not in DAY_NAMES) else \
+              [d for d in (days or []) if d not in DAY_NAMES]
+        if bad:
+            emit(envelope(False,
+                          errors=[_err("E_SCHEMA_INVALID",
+                                       f"不合法的星期值：{','.join(bad)}",
+                                       allowed=list(DAY_NAMES))]),
+                 args.json)
+    else:
+        wd = sorted({_lesson_date(l).weekday() for l in removed if _lesson_date(l)})
+        if not wd:
+            emit(envelope(False,
+                          errors=[_err("E_SCHEMA_INVALID",
+                                       f"{args.at} 起無未來 lessons 可推導星期，"
+                                       "請指定 --day 或 --days")]),
+                 args.json)
+        derived = [DAY_NAMES[i] for i in wd]
+        day, days = (derived[0], None) if len(derived) == 1 else (None, derived)
 
-    # 建後段
-    existing_ids = [s.get("id", "") for s in new_data["schedules"] if s.get("id", "").startswith("SCH-")]
-    max_n = max([int(x.split("-")[1]) for x in existing_ids if x.split("-")[1].isdigit()] + [0])
-    after = {"id": f"SCH-{max_n + 1:03d}",
-             "class_id": target["class_id"],
-             "start_date": args.at}
-
-    # day/days 來自 args；沒指定就沿用原 schedule
-    if args.day:
-        after["day"] = args.day
-    elif args.days:
-        after["days"] = [d.strip().lower() for d in args.days.split(",") if d.strip()]
-    elif "day" in target:
-        after["day"] = target["day"]
-    elif "days" in target:
-        after["days"] = list(target["days"])
-
-    # slot/time 來自 args；沒指定就沿用
+    # 後段 slot/time：args 優先；沒指定就沿用前段
+    after_slot = None
+    after_time = None
     if args.to_time:
-        after["time"] = args.to_time
+        after_time = args.to_time
     elif args.to_slot:
         slot = slots_by_id.get(args.to_slot)
         if not slot:
             emit(envelope(False, errors=[_err("E_SLOT_NOT_FOUND",
                                               f"slot {args.to_slot} 不存在")]), args.json)
-        after["slot_id"] = args.to_slot
-        after["time"] = slot.get("time")
+        after_slot = args.to_slot
+        after_time = slot.get("time")
     else:
-        if target.get("slot_id"):
-            after["slot_id"] = target["slot_id"]
-        if target.get("time"):
-            after["time"] = target["time"]
+        after_slot = target.get("slot_id")
+        after_time = target.get("time")
+    if not after_time:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   "無法決定後段時段，請指定 --to-slot 或 --to-time")]),
+             args.json)
 
-    # 終止條件（前段被截斷了，後段必須明確指定一個；不沿用前段 end_date）
-    if args.weeks is not None:
-        after["duration_weeks"] = args.weeks
-    elif args.end:
-        after["end_date"] = args.end
-    elif args.lessons is not None:
-        after["total_lessons"] = args.lessons
-    else:
+    # 終止條件（後段必須明確指定一個）
+    if args.weeks is None and args.end is None and args.lessons is None:
         emit(envelope(False,
                       errors=[_err("E_NO_TERMINATION",
                                    "後段需要終止條件：--weeks N / --end YYYY-MM-DD / --lessons N")],
                       next_actions=["再跑一次加上 --weeks 12 或 --end 2026-12-31 等"]),
              args.json)
 
+    try:
+        dates = expand_pattern_dates(day=day, days=days, start=args.at,
+                                     end=args.end, weeks=args.weeks,
+                                     total_lessons=args.lessons)
+    except ValueError as e:
+        emit(envelope(False, errors=[_err("E_SCHEMA_INVALID", str(e))]), args.json)
+    if not dates:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   "後段展開結果為 0 堂，請檢查參數")]),
+             args.json)
+
+    new_data = copy.deepcopy(data)
+    # 建後段 schedule metadata
+    after_id = next_schedule_id(new_data.get("schedules", []) or [])
+    after = {"id": after_id, "class_id": target["class_id"]}
+    if after_slot:
+        after["slot_id"] = after_slot
+    after["time"] = after_time
+    label = make_label(day=day, days=days)
+    if label:
+        after["label"] = label
     if args.note:
         after["note"] = args.note
-
     new_data["schedules"].append(after)
-    _commit_or_preview(args, new_data,
-                       {"split_at": args.at,
-                        "before": {"id": target.get("id"), "end_date": str(cutoff)},
-                        "after": after})
+    # 刪除 from 起的未來 lessons + 重生後段 lessons
+    removed_ids = {l.get("id") for l in removed}
+    new_data["lessons"] = [l for l in new_data.get("lessons", []) or []
+                           if l.get("id") not in removed_ids]
+    makeups_reverted = _revert_makeups_for_removed_lessons(new_data, removed_ids)
+    new_lessons = _alloc_lessons(all_lessons, dates,
+                                 class_id=target["class_id"],
+                                 time_str=after_time,
+                                 schedule_id=after_id,
+                                 slot_id=after_slot,
+                                 note=args.note)
+    new_data["lessons"].extend(new_lessons)
+    _sort_lessons(new_data["lessons"])
+    # 前段沒剩任何 lessons → 連 schedule metadata 刪
+    before_removed = len(kept) == 0
+    if before_removed:
+        new_data["schedules"] = [s for s in new_data["schedules"] if s.get("id") != sid]
+    success = {"split_at": args.at,
+               "before": {"id": sid, "kept_lessons": len(kept),
+                          "removed_lessons": len(removed),
+                          "schedule_removed": before_removed},
+               "after": {"schedule": after,
+                         "lessons_added": len(new_lessons),
+                         "lesson_dates": [str(d) for d in dates]}}
+    if makeups_reverted:
+        success["makeups_reverted"] = makeups_reverted
+    _commit_or_preview(args, new_data, success)
 
 
 def cmd_end_class(args):
-    """結束班級：from（含）起不再帶這個班；之前已上堂次全保留（月報表照算）"""
+    """結束班級：刪 from（含）起的 lessons；schedule 無剩餘 lessons → 連 schedule 刪；
+    class 全空 → 連 class 刪（已上堂次全保留，月報表照算）"""
     data = load_yaml(args.file)
     classes = data.get("classes") or []
     if not any(c.get("id") == args.class_id for c in classes):
         emit(envelope(False,
                       errors=[_err("E_CLASS_NOT_FOUND", f"class {args.class_id} 不存在")]),
              args.json)
-    try:
-        from_date = datetime.strptime(args.from_date, "%Y-%m-%d").date()
-    except ValueError:
+    from_date = _parse_date_safe(args.from_date)
+    if from_date is None:
         emit(envelope(False,
                       errors=[_err("E_SCHEMA_INVALID",
                                    f"--from {args.from_date} 不是合法 YYYY-MM-DD")]),
              args.json)
     schedules = data.get("schedules", []) or []
+    all_lessons = data.get("lessons", []) or []
     class_schedules = [s for s in schedules if s.get("class_id") == args.class_id]
-    if not class_schedules:
+    class_lessons = [l for l in all_lessons if l.get("class_id") == args.class_id]
+    if not class_schedules and not class_lessons:
         emit(envelope(False,
                       errors=[_err("E_SCHEMA_INVALID",
                                    f"class {args.class_id} 沒有排課，改用 remove-class")]),
              args.json)
-    slots_by_id = {s["id"]: s for s in data.get("slots", []) if s.get("id")}
-    classes_by_id = {c["id"]: c for c in classes if c.get("id")}
-    lessons = expand_schedule(schedules, slots_by_id, classes_by_id)
+
+    kept = [l for l in class_lessons
+            if (_lesson_date(l) is not None and _lesson_date(l) < from_date)]
+    removed = [l for l in class_lessons
+               if (_lesson_date(l) is None or _lesson_date(l) >= from_date)]
+    removed_lesson_ids = {l.get("id") for l in removed}
 
     new_data = copy.deepcopy(data)
+    new_data["lessons"] = [l for l in new_data.get("lessons", []) or []
+                           if l.get("id") not in removed_lesson_ids]
+    makeups_reverted = _revert_makeups_for_removed_lessons(new_data, removed_lesson_ids)
+
+    remaining_by_sched = {}
+    for l in new_data["lessons"]:
+        if l.get("schedule_id"):
+            remaining_by_sched.setdefault(l["schedule_id"], 0)
+            remaining_by_sched[l["schedule_id"]] += 1
     truncated = []
     removed_ids = []
-    kept_total = 0
-    removed_total = 0
-
-    for orig in class_schedules:
-        sid = orig.get("id")
+    for s in class_schedules:
+        sid = s.get("id")
         if not sid:
             continue
-        sched_lessons = [l for l in lessons if l.get("schedule_id") == sid]
-        kept = sum(1 for l in sched_lessons if l["date"] < from_date)
-        removed = sum(1 for l in sched_lessons if l["date"] >= from_date)
-        kept_total += kept
-        removed_total += removed
-        if removed == 0:
-            continue
-        if kept == 0:
-            new_data["schedules"] = [s for s in new_data["schedules"] if s.get("id") != sid]
+        affected = any(l.get("schedule_id") == sid for l in removed)
+        if remaining_by_sched.get(sid, 0) == 0:
             removed_ids.append(sid)
-            continue
-        ns = next(s for s in new_data["schedules"] if s.get("id") == sid)
-        if "specific_dates" in ns:
-            ns["specific_dates"] = sorted(
-                str(d) for d in ns["specific_dates"]
-                if (pd := _parse_date_safe(d)) is not None and pd < from_date
-            )
-        else:
-            ns["end_date"] = str(from_date - timedelta(days=1))
-            ns.pop("duration_weeks", None)
-            ns.pop("total_lessons", None)
-        truncated.append(sid)
+        elif affected:
+            truncated.append(sid)
+    new_data["schedules"] = [s for s in new_data.get("schedules", []) or []
+                             if s.get("id") not in set(removed_ids)]
 
-    class_removed = not any(s.get("class_id") == args.class_id for s in new_data["schedules"])
+    class_has_lessons = any(l.get("class_id") == args.class_id for l in new_data["lessons"])
+    class_has_schedules = any(s.get("class_id") == args.class_id for s in new_data["schedules"])
+    class_removed = not class_has_lessons and not class_has_schedules
+    makeups_removed = 0
     if class_removed:
         new_data["classes"] = [c for c in new_data["classes"] if c.get("id") != args.class_id]
+        old_makeups = new_data.get("makeups", []) or []
+        makeups_removed = sum(1 for m in old_makeups if m.get("class_id") == args.class_id)
+        if makeups_removed:
+            new_data["makeups"] = [m for m in old_makeups
+                                   if m.get("class_id") != args.class_id]
 
-    _commit_or_preview(args, new_data, {
+    success = {
         "ended_class_id": args.class_id,
         "from": args.from_date,
-        "kept_lessons": kept_total,
-        "removed_lessons": removed_total,
+        "kept_lessons": len(kept),
+        "removed_lessons": len(removed),
         "schedules_truncated": truncated,
         "schedules_removed": removed_ids,
         "class_removed": class_removed,
-    })
-
-
-def _parse_date_safe(d):
-    try:
-        return datetime.strptime(str(d), "%Y-%m-%d").date()
-    except Exception:
-        return None
+        "makeups_removed": makeups_removed,
+    }
+    if makeups_reverted:
+        success["makeups_reverted"] = makeups_reverted
+    _commit_or_preview(args, new_data, success)
 
 
 def cmd_undo(args):
@@ -692,22 +933,19 @@ def cmd_undo(args):
 
 
 def cmd_cancel_lesson(args):
-    """取消某堂課不補：在原 schedule 加 except_dates"""
+    """取消某堂課：直接刪該 (class, date) 的 lesson；--makeup 同時登記欠補"""
     data = load_yaml(args.file)
-    schedules = data.get("schedules", []) or []
-    slots_by_id = {s["id"]: s for s in data.get("slots", []) if s.get("id")}
-    classes_by_id = {c["id"]: c for c in data.get("classes", []) if c.get("id")}
-    lessons = expand_schedule(schedules, slots_by_id, classes_by_id)
+    lessons = data.get("lessons", []) or []
     target_date = _parse_date_safe(args.date)
     if target_date is None:
         emit(envelope(False,
                       errors=[_err("E_SCHEMA_INVALID",
                                    f"日期格式錯誤：{args.date}（需 YYYY-MM-DD）")]),
              args.json)
-    matched = [l for l in lessons if l["class_id"] == args.class_id and l["date"] == target_date]
+    matched = _match_lessons(lessons, args.class_id, target_date)
     if not matched:
         emit(envelope(False,
-                      errors=[_err("E_SCHEMA_INVALID",
+                      errors=[_err("E_LESSON_NOT_FOUND",
                                    f"class {args.class_id} 在 {args.date} 沒有課可取消")]),
              args.json)
     if len(matched) > 1:
@@ -717,39 +955,32 @@ def cmd_cancel_lesson(args):
                                    matches=matched)]),
              args.json)
     src = matched[0]
-    src_sched_id = src.get("schedule_id")
-    if not src_sched_id:
-        emit(envelope(False,
-                      errors=[_err("E_SCHEMA_INVALID",
-                                   "原 schedule 沒有 id（需要 migration）")]),
-             args.json)
     new_data = copy.deepcopy(data)
-    for s in new_data["schedules"]:
-        if s.get("id") == src_sched_id:
-            ed = [str(x) for x in (s.get("except_dates") or [])]
-            if args.date in ed:
-                emit(envelope(False,
-                              errors=[_err("E_DUPLICATE_SCHEDULE",
-                                           f"{args.date} 已在 except_dates 內")]),
-                     args.json)
-            ed.append(args.date)
-            s["except_dates"] = sorted(ed)
-            break
+    new_data["lessons"] = [l for l in new_data["lessons"] if l.get("id") != src.get("id")]
+    reverted = _revert_makeups_for_removed_lessons(new_data, {src.get("id")})
     success = {"cancelled_date": args.date,
-               "schedule_id": src_sched_id,
+               "lesson_id": src.get("id"),
+               "schedule_id": src.get("schedule_id"),
                "reason": args.reason or ""}
+    if reverted:
+        success["makeups_reverted"] = reverted
     next_actions = None
-    if args.makeup:
+    if reverted:
+        success["makeups_reused"] = reverted
+        next_actions = [f"既有待補課 {mu_id} 已恢復；補課日決定後：fulfill-makeup "
+                        f"--makeup-id {mu_id} --date <YYYY-MM-DD> --slot <slot> --apply"
+                        for mu_id in reverted]
+    elif args.makeup:
         makeups = new_data.setdefault("makeups", [])
         mu_id = next_makeup_id(makeups)
         entry = {"id": mu_id,
                  "class_id": args.class_id,
                  "origin_date": args.date,
-                 "origin_schedule_id": src_sched_id,
+                 "origin_schedule_id": src.get("schedule_id"),
                  "reason": args.reason or "",
                  "status": "pending",
                  "makeup_date": None,
-                 "makeup_schedule_id": None}
+                 "makeup_lesson_id": None}
         makeups.append(entry)
         success["makeup"] = entry
         next_actions = [f"補課日決定後：fulfill-makeup --makeup-id {mu_id} "
@@ -758,7 +989,7 @@ def cmd_cancel_lesson(args):
 
 
 def cmd_fulfill_makeup(args):
-    """銷帳一筆待補課：新增補課那堂（specific_dates）+ 標記 makeup fulfilled"""
+    """銷帳一筆待補課：加一筆 standalone lesson + 該筆 makeup 標 fulfilled"""
     data = load_yaml(args.file)
     makeups = data.get("makeups", []) or []
     target = next((m for m in makeups if m.get("id") == args.makeup_id), None)
@@ -774,6 +1005,11 @@ def cmd_fulfill_makeup(args):
                       errors=[_err("E_MAKEUP_ALREADY_FULFILLED",
                                    f"{args.makeup_id} 已於 {target.get('makeup_date')} 補課")]),
              args.json)
+    if _parse_date_safe(args.date) is None:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   f"日期格式錯誤：{args.date}（需 YYYY-MM-DD）")]),
+             args.json)
     slots = data.get("slots", []) or []
     if not args.slot_id and not args.time:
         emit(envelope(False,
@@ -785,30 +1021,31 @@ def cmd_fulfill_makeup(args):
                       errors=[_err("E_SLOT_NOT_FOUND", f"slot {args.slot_id} 不存在")]),
              args.json)
     class_id = target.get("class_id")
-    new_data = copy.deepcopy(data)
-    existing_ids = [s.get("id", "") for s in new_data.get("schedules", []) if s.get("id", "").startswith("SCH-")]
-    max_n = max([int(x.split("-")[1]) for x in existing_ids if x.split("-")[1].isdigit()] + [0])
-    new_sched = {"id": f"SCH-{max_n + 1:03d}",
-                 "class_id": class_id,
-                 "specific_dates": [args.date]}
     if args.time:
-        new_sched["time"] = args.time
-    elif args.slot_id:
+        time_str = args.time
+        slot_id = None
+    else:
         slot_def = next(s for s in slots if s.get("id") == args.slot_id)
-        new_sched["slot_id"] = args.slot_id
-        new_sched["time"] = slot_def.get("time")
-    new_sched["note"] = args.note or f"補課（原 {target.get('origin_date')}）"
-    new_data.setdefault("schedules", []).append(new_sched)
+        time_str = slot_def.get("time")
+        slot_id = args.slot_id
+    note = args.note or f"補課（原 {target.get('origin_date')}）"
+    new_data = copy.deepcopy(data)
+    new_lesson = _alloc_lessons(data.get("lessons", []) or [], [args.date],
+                                class_id=class_id, time_str=time_str,
+                                slot_id=slot_id, note=note)[0]
+    new_data.setdefault("lessons", []).append(new_lesson)
+    _sort_lessons(new_data["lessons"])
     for m in new_data["makeups"]:
         if m.get("id") == args.makeup_id:
             m["status"] = "fulfilled"
             m["makeup_date"] = args.date
-            m["makeup_schedule_id"] = new_sched["id"]
+            m["makeup_lesson_id"] = new_lesson["id"]
+            m.pop("makeup_schedule_id", None)
             break
     _commit_or_preview(args, new_data,
                        {"fulfilled_makeup": args.makeup_id,
                         "makeup_date": args.date,
-                        "added_lesson": new_sched})
+                        "added_lesson": new_lesson})
 
 
 def cmd_list_makeups(args):
@@ -846,7 +1083,7 @@ def cmd_cancel_makeup(args):
 
 
 def cmd_add_lesson(args):
-    """臨時加一堂（單日 specific_dates 簡化版）"""
+    """臨時加一堂：直接加一筆 standalone lesson"""
     data = load_yaml(args.file)
     classes = data.get("classes", []) or []
     slots = data.get("slots", []) or []
@@ -854,6 +1091,11 @@ def cmd_add_lesson(args):
         emit(envelope(False,
                       errors=[_err("E_CLASS_NOT_FOUND", f"class {args.class_id} 不存在",
                                    available=[c.get("id") for c in classes])]),
+             args.json)
+    if _parse_date_safe(args.date) is None:
+        emit(envelope(False,
+                      errors=[_err("E_SCHEMA_INVALID",
+                                   f"日期格式錯誤：{args.date}（需 YYYY-MM-DD）")]),
              args.json)
     if not args.slot_id and not args.time:
         emit(envelope(False,
@@ -864,31 +1106,33 @@ def cmd_add_lesson(args):
         emit(envelope(False,
                       errors=[_err("E_SLOT_NOT_FOUND", f"slot {args.slot_id} 不存在")]),
              args.json)
-    new_data = copy.deepcopy(data)
-    existing_ids = [s.get("id", "") for s in new_data.get("schedules", []) if s.get("id", "").startswith("SCH-")]
-    max_n = max([int(x.split("-")[1]) for x in existing_ids if x.split("-")[1].isdigit()] + [0])
-    new_sched = {"id": f"SCH-{max_n + 1:03d}",
-                 "class_id": args.class_id,
-                 "specific_dates": [args.date]}
     if args.time:
-        new_sched["time"] = args.time
-    elif args.slot_id:
+        time_str = args.time
+        slot_id = None
+    else:
         slot_def = next(s for s in slots if s.get("id") == args.slot_id)
-        new_sched["slot_id"] = args.slot_id
-        new_sched["time"] = slot_def.get("time")
-    if args.note:
-        new_sched["note"] = args.note
-    new_data.setdefault("schedules", []).append(new_sched)
-    _commit_or_preview(args, new_data, {"added_lesson": new_sched})
+        time_str = slot_def.get("time")
+        slot_id = args.slot_id
+    new_data = copy.deepcopy(data)
+    new_lesson = _alloc_lessons(data.get("lessons", []) or [], [args.date],
+                                class_id=args.class_id, time_str=time_str,
+                                slot_id=slot_id, note=args.note)[0]
+    new_data.setdefault("lessons", []).append(new_lesson)
+    _sort_lessons(new_data["lessons"])
+    _commit_or_preview(args, new_data, {"added_lesson": new_lesson})
 
 
 def cmd_update_schedule(args):
-    """改一條 schedule 的欄位（起始日/時段/星期/週期）"""
+    """改一條 schedule：保留 date < 今天的 lessons；今天（含）起的依新參數重生。
+
+    - 有給 pattern / 期間參數（--day/--days/--start/--end/--weeks/--lessons）：
+      未來 lessons 刪除重展開（星期沒給就從現有未來 lessons 推導）
+    - 只給 --slot/--time/--note：未來 lessons 原地改時段（保留個別挪課過的日期）
+    """
     data = load_yaml(args.file)
     schedules = data.get("schedules", []) or []
     slots = data.get("slots", []) or []
     slots_by_id = {s["id"]: s for s in slots if s.get("id")}
-    classes_by_id = {c["id"]: c for c in (data.get("classes", []) or []) if c.get("id")}
 
     # 1. 目標解析
     target = None
@@ -915,8 +1159,7 @@ def cmd_update_schedule(args):
         else:
             candidates_info = [
                 {"id": c.get("id"),
-                 "day": c.get("day"),
-                 "days": c.get("days"),
+                 "label": c.get("label"),
                  "time": c.get("time")}
                 for c in candidates
             ]
@@ -955,7 +1198,7 @@ def cmd_update_schedule(args):
                                    "--day 和 --days 不能同時指定")]),
              args.json)
 
-    # 星期值驗證（preview 會先展開堂次，壞值不擋會 ValueError）
+    # 星期值驗證
     if args.day is not None:
         bad_days = [args.day] if args.day not in DAY_NAMES else []
     elif args.days is not None:
@@ -989,49 +1232,11 @@ def cmd_update_schedule(args):
                                    available=list(slots_by_id.keys()))]),
              args.json)
 
-    # 3. 套用（深拷貝後修改）
+    # 3. 套用（深拷貝後修改 metadata）
     new_data = copy.deepcopy(data)
     new_sched = next(s for s in new_data["schedules"] if s.get("id") == target.get("id"))
 
     changed_fields = []
-
-    if args.start is not None:
-        if new_sched.get("start_date") != args.start:
-            changed_fields.append("start_date")
-        new_sched["start_date"] = args.start
-
-    if args.weeks is not None:
-        if new_sched.get("duration_weeks") != args.weeks:
-            changed_fields.append("duration_weeks")
-        new_sched["duration_weeks"] = args.weeks
-        new_sched.pop("end_date", None)
-        new_sched.pop("total_lessons", None)
-    elif args.end is not None:
-        if str(new_sched.get("end_date", "")) != args.end:
-            changed_fields.append("end_date")
-        new_sched["end_date"] = args.end
-        new_sched.pop("duration_weeks", None)
-        new_sched.pop("total_lessons", None)
-    elif args.lessons is not None:
-        if new_sched.get("total_lessons") != args.lessons:
-            changed_fields.append("total_lessons")
-        new_sched["total_lessons"] = args.lessons
-        new_sched.pop("duration_weeks", None)
-        new_sched.pop("end_date", None)
-
-    if args.day is not None:
-        if new_sched.get("day") != args.day:
-            changed_fields.append("day")
-        new_sched["day"] = args.day
-        new_sched.pop("days", None)
-        new_sched.pop("specific_dates", None)
-    elif args.days is not None:
-        parsed_days = _parse_days(args.days)
-        if new_sched.get("days") != parsed_days:
-            changed_fields.append("days")
-        new_sched["days"] = parsed_days
-        new_sched.pop("day", None)
-        new_sched.pop("specific_dates", None)
 
     if args.slot_id is not None:
         if new_sched.get("slot_id") != args.slot_id:
@@ -1056,30 +1261,112 @@ def cmd_update_schedule(args):
             changed_fields.append("note")
         new_sched["note"] = args.note
 
-    # 4. 前後對照（展開堂次）
+    for flag, field in [(args.start, "start_date"), (args.end, "end_date"),
+                        (args.weeks, "duration_weeks"), (args.lessons, "total_lessons"),
+                        (args.day, "day"), (args.days, "days")]:
+        if flag is not None:
+            changed_fields.append(field)
+
+    # lesson 生效時段：metadata time（凍結顯示值）優先，無則查 slot
+    eff_time = new_sched.get("time")
+    if not eff_time and new_sched.get("slot_id"):
+        eff_time = slots_by_id.get(new_sched["slot_id"], {}).get("time")
+
+    # 4. lessons 分段：過去保留、未來重生 / 原地改
     today = date.today()
+    sid = target.get("id")
+    all_lessons = new_data.get("lessons", []) or []
+    sched_lessons = [l for l in all_lessons if l.get("schedule_id") == sid]
+    past = [l for l in sched_lessons
+            if (_lesson_date(l) is not None and _lesson_date(l) < today)]
+    future = [l for l in sched_lessons
+              if (_lesson_date(l) is None or _lesson_date(l) >= today)]
+    lessons_before = len(sched_lessons)
 
-    def _expand_one(sched_obj):
-        return expand_schedule(
-            [sched_obj],
-            slots_by_id,
-            classes_by_id,
-        )
+    pattern_regen = any(x is not None for x in
+                        (args.day, args.days, args.start, args.end,
+                         args.weeks, args.lessons))
 
-    lessons_before_list = _expand_one(target)
-    lessons_after_list = _expand_one(new_sched)
+    if pattern_regen:
+        # 星期：args 優先；沒給就從現有未來 lessons 推導
+        if args.day is not None:
+            day, days = args.day, None
+        elif args.days is not None:
+            day, days = None, _parse_days(args.days)
+        else:
+            wd = sorted({_lesson_date(l).weekday() for l in future if _lesson_date(l)})
+            if not wd:
+                emit(envelope(False,
+                              errors=[_err("E_SCHEMA_INVALID",
+                                           f"schedule {sid} 已無未來 lessons 可推導星期，"
+                                           "請指定 --day 或 --days")]),
+                     args.json)
+            derived = [DAY_NAMES[i] for i in wd]
+            day, days = (derived[0], None) if len(derived) == 1 else (None, derived)
+        # 起始：args 優先；否則從最早未來 lesson 起；再否則今天
+        if args.start:
+            start = args.start
+        elif future:
+            start = min(str(l.get("date")) for l in future)
+        else:
+            start = str(today)
+        # 終止：args 優先；否則保持原未來堂數
+        weeks, end, total = args.weeks, args.end, args.lessons
+        if weeks is None and end is None and total is None:
+            if not future:
+                emit(envelope(False,
+                              errors=[_err("E_NO_TERMINATION",
+                                           "已無未來 lessons，需指定 --weeks / --end / --lessons")]),
+                     args.json)
+            total = len(future)
+        try:
+            dates = expand_pattern_dates(day=day, days=days, start=start,
+                                         end=end, weeks=weeks, total_lessons=total)
+        except ValueError as e:
+            emit(envelope(False, errors=[_err("E_SCHEMA_INVALID", str(e))]), args.json)
+        # 只重生今天（含）以後；過去 lessons 一律保留
+        dates = [d for d in dates if d >= today]
+        if not eff_time:
+            emit(envelope(False,
+                          errors=[_err("E_SCHEMA_INVALID",
+                                       "無法決定時段，請指定 --slot 或 --time")]),
+                 args.json)
+        future_ids = {l.get("id") for l in future}
+        new_data["lessons"] = [l for l in all_lessons if l.get("id") not in future_ids]
+        makeups_reverted = _revert_makeups_for_removed_lessons(new_data, future_ids)
+        new_lessons = _alloc_lessons(data.get("lessons", []) or [], dates,
+                                     class_id=target.get("class_id"),
+                                     time_str=eff_time,
+                                     schedule_id=sid,
+                                     slot_id=new_sched.get("slot_id"))
+        new_data["lessons"].extend(new_lessons)
+        _sort_lessons(new_data["lessons"])
+        # label 跟著新 pattern 更新
+        new_label = make_label(day=day, days=days)
+        if new_label and new_sched.get("label") != new_label:
+            new_sched["label"] = new_label
+            if "label" not in changed_fields:
+                changed_fields.append("label")
+        after_dates = [str(l.get("date")) for l in past] + [str(d) for d in dates]
+        lessons_after = len(past) + len(dates)
+    else:
+        # 只改時段/備註：未來 lessons 原地改，日期不動
+        makeups_reverted = []
+        if ("time" in changed_fields or "slot_id" in changed_fields) and eff_time:
+            future_ids = {l.get("id") for l in future}
+            for l in new_data["lessons"]:
+                if l.get("id") in future_ids:
+                    l["time"] = eff_time
+                    if args.slot_id is not None:
+                        l["slot_id"] = args.slot_id
+        after_dates = [str(l.get("date")) for l in sched_lessons]
+        lessons_after = lessons_before
 
-    lessons_before = len(lessons_before_list)
-    lessons_after = len(lessons_after_list)
-
-    before_dates = set(l["date"] for l in lessons_before_list)
-    after_dates = set(l["date"] for l in lessons_after_list)
-    past_lost_dates = {d for d in before_dates if d < today} - after_dates
-    past_lessons_lost = len(past_lost_dates)
-
+    # 5. 統計（v4：過去 lessons 永不刪除 → past_lessons_lost 恆 0，欄位沿用）
     after_sorted = sorted(after_dates)
-    first_lesson = str(after_sorted[0]) if after_sorted else None
-    last_lesson = str(after_sorted[-1]) if after_sorted else None
+    first_lesson = after_sorted[0] if after_sorted else None
+    last_lesson = after_sorted[-1] if after_sorted else None
+    past_lessons_lost = 0
 
     success_data = {
         "schedule_id": target.get("id"),
@@ -1090,6 +1377,8 @@ def cmd_update_schedule(args):
         "last_lesson": last_lesson,
         "past_lessons_lost": past_lessons_lost,
     }
+    if makeups_reverted:
+        success_data["makeups_reverted"] = makeups_reverted
 
     next_actions = []
     if past_lessons_lost > 0:
@@ -1100,9 +1389,30 @@ def cmd_update_schedule(args):
     _commit_or_preview(args, new_data, success_data, next_actions=next_actions)
 
 
+def _schedule_weekdays(lessons, schedule_id):
+    """schedule 底下 lessons 的星期集合（remove-schedule --day 過濾用）"""
+    return {DAY_NAMES[_lesson_date(l).weekday()]
+            for l in lessons
+            if l.get("schedule_id") == schedule_id and _lesson_date(l) is not None}
+
+
 def cmd_remove_schedule(args):
+    """刪 schedule + 其全部 lessons"""
     data = load_yaml(args.file)
     schedules = data.get("schedules", []) or []
+    all_lessons = data.get("lessons", []) or []
+
+    def _remove(ids):
+        id_set = set(ids)
+        new_data = copy.deepcopy(data)
+        new_data["schedules"] = [s for s in new_data["schedules"]
+                                 if s.get("id") not in id_set]
+        removed_lesson_ids = {l.get("id") for l in new_data.get("lessons", []) or []
+                              if l.get("schedule_id") in id_set}
+        new_data["lessons"] = [l for l in new_data.get("lessons", []) or []
+                               if l.get("schedule_id") not in id_set]
+        makeups_reverted = _revert_makeups_for_removed_lessons(new_data, removed_lesson_ids)
+        return new_data, len(removed_lesson_ids), makeups_reverted
 
     # 若給了 --schedule-id，直接刪那條
     if getattr(args, "schedule_id", None):
@@ -1114,9 +1424,12 @@ def cmd_remove_schedule(args):
                                        f"schedule {args.schedule_id} 不存在",
                                        available=available)]),
                  args.json)
-        new_data = copy.deepcopy(data)
-        new_data["schedules"] = [s for s in new_data["schedules"] if s.get("id") != args.schedule_id]
-        _commit_or_preview(args, new_data, {"removed_count": 1, "removed_id": args.schedule_id})
+        new_data, removed_lessons, makeups_reverted = _remove([args.schedule_id])
+        success = {"removed_count": 1, "removed_id": args.schedule_id,
+                   "removed_lessons": removed_lessons}
+        if makeups_reverted:
+            success["makeups_reverted"] = makeups_reverted
+        _commit_or_preview(args, new_data, success)
         return
 
     if not args.class_id:
@@ -1125,34 +1438,34 @@ def cmd_remove_schedule(args):
                                    "請指定 --schedule-id 或 --class")]),
              args.json)
 
-    matched_idx = []
-    for i, s in enumerate(schedules):
+    matched_ids = []
+    for s in schedules:
         if s.get("class_id") != args.class_id:
             continue
         if args.slot_id and s.get("slot_id") != args.slot_id:
             continue
-        if args.day and s.get("day") != args.day:
+        if args.day and args.day not in _schedule_weekdays(all_lessons, s.get("id")):
             continue
-        matched_idx.append(i)
-    if not matched_idx:
+        matched_ids.append(s.get("id"))
+    if not matched_ids:
         emit(envelope(False,
                       errors=[_err("E_SCHEMA_INVALID",
                                    f"找不到 class={args.class_id} slot={args.slot_id} day={args.day} 的 schedule")]),
              args.json)
-    if len(matched_idx) > 1 and not args.all:
+    if len(matched_ids) > 1 and not args.all:
         emit(envelope(False,
                       errors=[_err("E_AMBIGUOUS_TARGET",
-                                   f"找到 {len(matched_idx)} 條匹配",
-                                   matches=[schedules[i] for i in matched_idx])],
+                                   f"找到 {len(matched_ids)} 條匹配",
+                                   matches=[s for s in schedules
+                                            if s.get("id") in set(matched_ids)])],
                       next_actions=["加 --all 全刪，或縮小條件（--slot-id / --day）"]),
              args.json)
-    new_data = copy.deepcopy(data)
-    keep = []
-    for i, s in enumerate(schedules):
-        if i not in matched_idx:
-            keep.append(s)
-    new_data["schedules"] = keep
-    _commit_or_preview(args, new_data, {"removed_count": len(matched_idx)})
+    new_data, removed_lessons, makeups_reverted = _remove(matched_ids)
+    success = {"removed_count": len(matched_ids),
+               "removed_lessons": removed_lessons}
+    if makeups_reverted:
+        success["makeups_reverted"] = makeups_reverted
+    _commit_or_preview(args, new_data, success)
 
 
 # -------------- argparse --------------
@@ -1192,34 +1505,34 @@ def build_parser():
 
     rc = sub.add_parser("remove-class", help="刪 class")
     rc.add_argument("--id", required=True)
-    rc.add_argument("--cascade", action="store_true", help="連帶刪 schedule")
+    rc.add_argument("--cascade", action="store_true", help="連帶刪 schedule/lesson")
     rc.add_argument("--apply", action="store_true")
 
-    asd = sub.add_parser("add-schedule", help="新增 schedule")
+    asd = sub.add_parser("add-schedule", help="新增 schedule（當場展開成 lessons）")
     asd.add_argument("--class", dest="class_id", required=True)
     asd.add_argument("--slot", dest="slot_id", help="當下常用時段別名（list-slots 看清單）；可省略改用 --time")
     asd.add_argument("--time", help="HH:MM-HH:MM 直接指定時段（任意插時，不需 slot 別名）")
-    asd.add_argument("--start", help="start_date YYYY-MM-DD")
+    asd.add_argument("--start", help="start_date YYYY-MM-DD（day/days 模式必填）")
     asd.add_argument("--day", help="單 day（mon|tue|...）")
     asd.add_argument("--days", help="多 day（逗號分隔）")
     asd.add_argument("--specific-dates", help="指定日期（逗號分隔）")
-    asd.add_argument("--weeks", type=int, help="duration_weeks")
-    asd.add_argument("--end", help="end_date YYYY-MM-DD")
-    asd.add_argument("--lessons", type=int, help="total_lessons")
+    asd.add_argument("--weeks", type=int, help="展開週數")
+    asd.add_argument("--end", help="展開終止日 YYYY-MM-DD")
+    asd.add_argument("--lessons", type=int, help="展開總堂數")
     asd.add_argument("--note")
     asd.add_argument("--apply", action="store_true")
 
     ss = sub.add_parser("split-schedule", help="切某條 schedule（過去不動 + 改未來）")
     ss.add_argument("--schedule-id", help="目標 schedule id（例 SCH-005）")
-    ss.add_argument("--class", dest="class_id", help="或指定 class（自動找該 class 唯一的 day/days schedule）")
+    ss.add_argument("--class", dest="class_id", help="或指定 class（自動找該 class 唯一的 schedule）")
     ss.add_argument("--at", required=True, help="從哪天開始改 YYYY-MM-DD（這天起算後段）")
     ss.add_argument("--day", help="後段 single day（不寫則沿用前段）")
     ss.add_argument("--days", help="後段 multi days（逗號分隔）")
     ss.add_argument("--to-slot", help="後段 slot 別名（不寫則沿用前段）")
     ss.add_argument("--to-time", help="後段時段 HH:MM-HH:MM（不寫則沿用前段）")
-    ss.add_argument("--weeks", type=int, help="後段 duration_weeks")
-    ss.add_argument("--end", help="後段 end_date YYYY-MM-DD")
-    ss.add_argument("--lessons", type=int, help="後段 total_lessons")
+    ss.add_argument("--weeks", type=int, help="後段展開週數")
+    ss.add_argument("--end", help="後段終止日 YYYY-MM-DD")
+    ss.add_argument("--lessons", type=int, help="後段總堂數")
     ss.add_argument("--note", help="後段備註（例「開學換時段」）")
     ss.add_argument("--apply", action="store_true")
 
@@ -1257,7 +1570,7 @@ def build_parser():
     cm.add_argument("--makeup-id", dest="makeup_id", required=True)
     cm.add_argument("--apply", action="store_true")
 
-    al = sub.add_parser("add-lesson", help="臨時加一堂（單日）")
+    al = sub.add_parser("add-lesson", help="臨時加一堂（單日 standalone lesson）")
     al.add_argument("--class", dest="class_id", required=True)
     al.add_argument("--date", required=True, help="新加課的日期 YYYY-MM-DD")
     al.add_argument("--slot", dest="slot_id", help="常用時段別名")
@@ -1265,7 +1578,7 @@ def build_parser():
     al.add_argument("--note")
     al.add_argument("--apply", action="store_true")
 
-    ml = sub.add_parser("move-lesson", help="挪一堂課（補課/改時段）")
+    ml = sub.add_parser("move-lesson", help="挪一堂課（原地改該筆 lesson 的日期/時段）")
     ml.add_argument("--class", dest="class_id", required=True)
     ml.add_argument("--from-date", required=True, help="原本上課日 YYYY-MM-DD")
     ml.add_argument("--to-date", required=True, help="改到哪天 YYYY-MM-DD")
@@ -1274,13 +1587,13 @@ def build_parser():
     ml.add_argument("--note", help="備註（例如「7/20 颱風停課改補」）")
     ml.add_argument("--apply", action="store_true")
 
-    up = sub.add_parser("update-schedule", help="改一條 schedule 的欄位（起始日/時段/星期/週期）")
+    up = sub.add_parser("update-schedule", help="改一條 schedule（過去保留、未來重生）")
     up.add_argument("--schedule-id", dest="schedule_id")
     up.add_argument("--class", dest="class_id")
-    up.add_argument("--start", help="新的 start_date YYYY-MM-DD")
-    up.add_argument("--end", help="新的 end_date YYYY-MM-DD（三擇一）")
-    up.add_argument("--weeks", type=int, help="新的 duration_weeks（三擇一）")
-    up.add_argument("--lessons", type=int, help="新的 total_lessons（三擇一）")
+    up.add_argument("--start", help="重展開起始日 YYYY-MM-DD")
+    up.add_argument("--end", help="重展開終止日 YYYY-MM-DD（三擇一）")
+    up.add_argument("--weeks", type=int, help="重展開週數（三擇一）")
+    up.add_argument("--lessons", type=int, help="重展開總堂數（三擇一）")
     up.add_argument("--day", help="改成單 day（mon|tue|...）")
     up.add_argument("--days", help="改成多 day（逗號分隔）")
     up.add_argument("--slot", dest="slot_id", help="改成指定 slot id")
@@ -1288,7 +1601,7 @@ def build_parser():
     up.add_argument("--note", help="備註")
     up.add_argument("--apply", action="store_true")
 
-    rs = sub.add_parser("remove-schedule", help="刪 schedule（按 schedule-id 或 class + 可選 slot/day）")
+    rs = sub.add_parser("remove-schedule", help="刪 schedule + 其全部 lessons（按 schedule-id 或 class + 可選 slot/day）")
     rs.add_argument("--schedule-id", dest="schedule_id", help="直接指定 schedule id 刪除")
     rs.add_argument("--class", dest="class_id")
     rs.add_argument("--slot-id")

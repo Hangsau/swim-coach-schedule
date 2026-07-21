@@ -18,12 +18,15 @@
 
 ## 用法
 
-### 1. 編輯 `data/schedule.yaml`
+### 1. 資料模型
 
-填三段：
-- **`slots:`** — 一天有哪些時段（時間 + 備註）
-- **`classes:`** — 你有哪些學員 / 班級（名稱 + 每週幾堂 + 程度）
-- **`schedules:`** — 每個班的排課（哪一天、哪個時段、什麼日期開始、持續幾週）
+`data/schedule.yaml` 使用 schema v4，但所有寫入都必須走 GUI 或 `schedule_cli.py`，不要直接編輯 YAML：
+
+- **`slots:`** — 常用時段（時間 + 備註）
+- **`classes:`** — 學員 / 班級資料
+- **`schedules:`** — 排課分組 metadata，只用來顯示「週二四」等分組，不負責展開日期
+- **`lessons:`** — 唯一課次真相；每堂一筆 `{id, schedule_id?, class_id, date, time, slot_id?, note?}`
+- **`makeups:`** — 待補課帳本；fulfilled 記錄以 `makeup_lesson_id` 指向實際補課堂
 
 ### 2. 查詢
 
@@ -47,9 +50,9 @@ python3 scripts/query.py class C04
 python3 scripts/query.py slot morning-1
 ```
 
-### 3. 範例
+### 3. 寫入
 
-`data/schedule.yaml` 已填 4 個範例班級（學齡前、青少年、成人、暑期密集）讓你看格式。
+日常操作使用下方 GUI；LLM 或進階操作使用 `schedule_cli.py` 的 dry-run → `--apply` 兩段式流程。
 
 ---
 
@@ -69,7 +72,7 @@ pythonw scripts\schedule_gui.py
   - 衝突日日期數字標紅；撞課錯誤訊息會寫成人話（撞到哪班、哪個時段）
 - **頭列「班級 ▾」** → 班級列表（每班顯示每週堂數與未來堂數；還欠補課時整列紅字標「⚠ 欠補 N 堂」），點一班 → **班級詳情面板**：
   - 頂端紅字「⚠ 還欠 N 堂補課」，每筆待補課一列，附「補課…」（開 fulfill-makeup 表單）與「撤銷」
-  - 每條排課列出**未來每一堂**的日期 chip（不再只給最近 3 堂），點一個日期 → 單堂選單：取消這堂（不補）／取消並登記待補（之後補）／挪到別天／只改這堂時間；已取消的未來日期以灰字標「已取消」
+  - 每條排課列出**實際存在的未來每一堂**日期 chip，點一個日期 → 單堂選單：取消這堂（不補）／取消並登記待補（之後補）／挪到別天／只改這堂時間
   - 點排課摘要列 → 改排課／換時段／刪除；底部班級級操作：修改資料／加一堂／新增排課／結束此班／刪除班級
 - 表單內所有日期欄位旁都有 **📅 小月曆**，點日期直接填入，不用手打
 - 每個動作都是「表單 → dry-run 看 diff → 確認才寫入」，底層全部走 `schedule_cli.py`，不直接碰 YAML
@@ -79,9 +82,9 @@ pythonw scripts\schedule_gui.py
 
 ---
 
-## 怎麼改成你真實的課表
+## Schema v4 範例
 
-把 `data/schedule.yaml` 改成你自己的內容：
+以下只用來理解資料形狀；實際新增班級與課次仍走 CLI／GUI：
 
 ```yaml
 slots:
@@ -96,12 +99,19 @@ classes:
     level: <程度>
 
 schedules:
-  - class_id: <對應classes的ID>
-    day: <mon/tue/wed/thu/fri/sat/sun>
+  - id: SCH-001
+    class_id: <對應classes的ID>
     slot_id: <對應slots的ID>
-    start_date: <YYYY-MM-DD>
-    duration_weeks: <週數>
-    note: <備註>
+    time: "HH:MM-HH:MM"
+    label: 週二四
+
+lessons:
+  - id: L-0001
+    schedule_id: SCH-001
+    class_id: <對應classes的ID>
+    date: <YYYY-MM-DD>
+    time: "HH:MM-HH:MM"
+    slot_id: <對應slots的ID>
 ```
 
 ---
@@ -168,9 +178,9 @@ python scripts/schedule_cli.py --json add-schedule --class STU-04 --slot S5 --da
 | `add-schedule --class (--slot\|--time) --start --(day\|days\|specific-dates) [--weeks\|--end\|--lessons] [--note]` | 新增 schedule | 是 |
 | `update-schedule (--schedule-id\|--class) [--start] [--end\|--weeks\|--lessons] [--day\|--days] [--slot\|--time] [--note]` | 就地改一條 schedule 的任意欄位（起始日填錯的救援路徑）；dry-run 回報前後堂數與 `past_lessons_lost` | 是 |
 | `remove-schedule (--schedule-id \| --class [--slot-id] [--day] [--all])` | 刪 schedule（`--schedule-id` 直刪指定條） | 是 |
-| `move-lesson --class --from-date --to-date [--to-slot\|--to-time] [--note]` | 挪一堂課（補課） | 是 |
+| `move-lesson --class --from-date --to-date [--to-slot\|--to-time] [--note]` | 原地修改一堂課的日期／時段，lesson ID 不變 | 是 |
 | `cancel-lesson --class --date [--reason] [--makeup]` | 取消一堂；加 `--makeup` 登記為待補課（欠補），補課日決定後用 `fulfill-makeup` 銷帳 | 是 |
-| `fulfill-makeup --makeup-id --date (--slot\|--time) [--note]` | 銷帳一筆待補課：新增補課那堂（specific_dates）並把該筆標記 fulfilled | 是 |
+| `fulfill-makeup --makeup-id --date (--slot\|--time) [--note]` | 銷帳一筆待補課：新增 standalone lesson 並把該筆標記 fulfilled | 是 |
 | `list-makeups [--class] [--status pending\|fulfilled\|all]` | 列待補課（預設只列 pending） | 否 |
 | `cancel-makeup --makeup-id` | 撤銷一筆待補課登記（不再欠補；不影響已取消的原課） | 是 |
 | `add-lesson --class --date (--slot\|--time) [--note]` | 臨時加一堂（單日） | 是 |
@@ -180,11 +190,11 @@ python scripts/schedule_cli.py --json add-schedule --class STU-04 --slot S5 --da
 
 某天不能上課但之後要補時，用「取消 → 登記欠補 → 補課銷帳」三步，讓行事曆替你記住還欠幾堂：
 
-1. `cancel-lesson --class C --date D --makeup --apply` — 取消那堂並登記 `MU-NNN`（status=pending），原課進 `except_dates`
-2. 補課日決定後 `fulfill-makeup --makeup-id MU-NNN --date 新日期 --slot S --apply` — 新增補課那堂、把 `MU-NNN` 標記 fulfilled 並連到新 schedule
+1. `cancel-lesson --class C --date D --makeup --apply` — 刪除該 lesson 並登記 `MU-NNN`（status=pending）
+2. 補課日決定後 `fulfill-makeup --makeup-id MU-NNN --date 新日期 --slot S --apply` — 新增補課 lesson、把 `MU-NNN` 標記 fulfilled 並以 `makeup_lesson_id` 指向該堂
 3. 隨時 `list-makeups` 看還欠哪幾堂；登記錯了用 `cancel-makeup --makeup-id MU-NNN` 撤銷
 
-`makeups` 是 optional 頂層 list，每筆 `{id, class_id, origin_date, origin_schedule_id, reason, status, makeup_date, makeup_schedule_id}`。GUI 班級詳情面板會用紅字顯示「還欠 N 堂補課」並提供一鍵補課。
+`makeups` 是 optional 頂層 list，每筆 `{id, class_id, origin_date, origin_schedule_id, reason, status, makeup_date, makeup_lesson_id}`。若已銷帳的補課 lesson 被刪除，原 MU 會自動回到 pending；再次選「取消並登記待補」也不會重複記兩筆。GUI 班級詳情面板會用紅字顯示「還欠 N 堂補課」。
 
 ### 錯誤碼處理表
 
@@ -195,8 +205,8 @@ python scripts/schedule_cli.py --json add-schedule --class STU-04 --slot S5 --da
 | `E_DUPLICATE_ID` | 該 id 已存在 | 改用 `update-class` 或換一個 id |
 | `E_DUPLICATE_SCHEDULE` | 完全相同的 schedule 重複 | 不需重加；改用 `update-schedule` 或先 remove |
 | `E_SCHEDULE_NOT_FOUND` | schedule id 不存在（或該班沒有 schedule） | 看 `context.available`；`list-classes --with-schedules` 查 id |
+| `E_LESSON_NOT_FOUND` | 指定日期沒有可操作的 lesson，或 makeup 指向不存在的 lesson | 重新查詢該班課次／makeup 狀態後再操作 |
 | `E_TIME_OVERLAP` | 兩堂課時段重疊（教練只有一人） | 看 `context.lesson_a/b`；改時段或挪其中一堂 |
-| `E_WEEKLY_COUNT_EXCEEDED` | 排的堂數 > class.weekly_count | 先 `update-class --weekly-count` 拉高，或減 schedule |
 | `E_INVALID_DATE_RANGE` | end_date <= start_date / time 反序 / 跨午夜 | 修日期或時段 |
 | `E_DATE_TOO_FAR` | 日期超過合理 horizon | 拆短週期，或檢查日期 |
 | `E_NO_TERMINATION` | day/days 沒帶 duration_weeks/end_date/total_lessons | 加一個終止條件 |
@@ -256,7 +266,7 @@ python scripts/schedule_cli.py --json move-lesson \
   --note "颱風停課改週六補" --apply
 ```
 
-行為：原 schedule 自動加 `except_dates: [2026-07-08]`（跳過該日且不算進 total_lessons）+ 新增一條 specific_dates 補課條目到 7/11。要改時段一起改用 `--to-time "下午時段"` 或 `--to-slot S5`。
+行為：原本那筆 lesson 直接原地改成 7/11，lesson ID 與 schedule 分組不變，不會建立負面日期清單或空殼排課。要改時段一起使用 `--to-time "15:00-16:00"` 或 `--to-slot S5`。
 
 ### 換時段不動過去（中段切換）
 
@@ -275,11 +285,9 @@ python scripts/schedule_cli.py --json split-schedule \
 - 後段終止：`--weeks N` / `--end YYYY-MM-DD` / `--lessons N`（**必須選一個**，不然 fail）
 - 該 class 有多條 day/days schedule 時必須用 `--schedule-id SCH-XXX` 明指
 
-### 過渡週的 weekly_count 衝突
+### weekly_count 的定位
 
-split-schedule 過渡週可能會多一堂課（前段結尾 + 後段開頭重疊到同一週），引發 `E_WEEKLY_COUNT_EXCEEDED`。處理方式：
-1. 先 `update-class --weekly-count` 暫時拉高，過渡週後再改回
-2. 或挑下一個週一作為 `--at`，避免跨週
+`classes[].weekly_count` 在 v4 是 GUI 顯示用 metadata，不再是加課／補課的硬上限。實際安全門檻是同時段重疊檢查；臨時加課不會因超過 weekly_count 被拒絕。
 
 ### 範例：Hang 在 TG 說「STU-11 阿明 每週二四 早上 10:10 從 7/15 排 12 堂」
 

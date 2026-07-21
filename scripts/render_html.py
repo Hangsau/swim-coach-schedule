@@ -46,20 +46,20 @@ def load():
     return yaml.safe_load(DATA.read_text(encoding="utf-8"))
 
 
-def expand_schedule(schedules, slots_by_id, classes_by_id):
+def expand_schedule(schedules, slots_by_id, classes_by_id, data=None):
     """直接用 query.py 的 expand_schedule（單一來源，避免 drift）"""
     import sys
     if "scripts" not in sys.path:
         sys.path.insert(0, str(Path(__file__).parent))
     from query import expand_schedule as _expand
-    return _expand(schedules, slots_by_id, classes_by_id)
+    return _expand(schedules, slots_by_id, classes_by_id, data=data)
 
 
 def render_month(data, year, month):
     """渲染月曆 view。"""
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
-    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id, data=data)
 
     # 該月所有 lesson
     month_lessons = [l for l in all_lessons if l["date"].year == year and l["date"].month == month]
@@ -465,7 +465,7 @@ def render_index(data, available_months):
     """渲染首頁：頂部快速導航 → 接下來 7 天 → 完整未來課程（收合）"""
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
-    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id, data=data)
 
     today = date.today()
     future_lessons = [l for l in all_lessons if l["date"] >= today]
@@ -556,7 +556,7 @@ def collect_months_with_data(data):
     """找出 schedule 涵蓋的所有月份"""
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
-    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id, data=data)
 
     months = set()
     for l in all_lessons:
@@ -582,7 +582,7 @@ def render_summary(data):
 
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
-    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id, data=data)
 
     html = ['<!DOCTYPE html>',
             '<html lang="zh-TW">',
@@ -661,7 +661,7 @@ def render_grid(data, year, month):
     """
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
-    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id, data=data)
 
     # 篩選該月
     month_lessons = [l for l in all_lessons if l["date"].year == year and l["date"].month == month]

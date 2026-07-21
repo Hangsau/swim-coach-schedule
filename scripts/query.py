@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-query.py — 游泳教練課表查詢工具
+query.py — 游泳教練課表查詢工具（v4：直接讀頂層 lessons）
 
 Usage:
   python3 query.py today
@@ -38,106 +38,37 @@ def _to_date(d):
     return datetime.strptime(str(d), "%Y-%m-%d").date()
 
 
-def _resolve_time(s, slot):
-    """schedule.time 優先（凍結值）；無則查 slot.time（當下定義）"""
-    if s.get("time"):
-        return s["time"]
-    return slot.get("time", "?")
+def expand_schedule(schedules, slots_by_id, classes_by_id, data=None):
+    """回傳明確課次清單（v4）
 
+    v4 起課次真相在頂層 `lessons`，本函式不再做 pattern 展開；
+    `schedules` 參數保留只為呼叫端簽名相容（不參與展開）。
+    回傳形狀與 v3 完全一致：每筆含
+      date / day / slot_id / slot_time / slot_note /
+      class_id / class_name / level / note / schedule_id
 
-def _except_set(s):
-    """schedule.except_dates 排除清單（move-lesson 用）"""
-    raw = s.get("except_dates") or []
-    out = set()
-    for d in raw:
-        try:
-            out.add(_to_date(d))
-        except Exception:
-            pass
-    return out
-
-
-def expand_schedule(schedules, slots_by_id, classes_by_id):
-    """展開 schedule → 具體日期清單
-
-    模式：
-      - specific_dates: 直接展開成給定清單（一次性的課）
-      - day + start_date + duration_weeks/end_date: 每週固定那天
-      - days + start_date + total_lessons/end_date/duration_weeks: 多日固定
-
-    schedule 可帶：
-      - time（凍結時段，例如 "15:00-16:00"，優先於 slot.time）
-      - except_dates（排除清單，move-lesson 用）
+    data: load() 回傳的整份 yaml dict；未傳時自動讀預設檔。
     """
+    if data is None:
+        data = load()
     expanded = []
-    for s in schedules:
-        slot = slots_by_id.get(s.get("slot_id"), {}) if s.get("slot_id") else {}
-        cls = classes_by_id.get(s["class_id"], {})
-        slot_time = _resolve_time(s, slot)
-        slot_note = slot.get("note", "")
-        except_dates = _except_set(s)
-
-        def _emit(current, day_label):
-            if current in except_dates:
-                return False
-            expanded.append({
-                "date": current,
-                "day": day_label,
-                "slot_id": s.get("slot_id"),
-                "slot_time": slot_time,
-                "slot_note": slot_note,
-                "class_id": s["class_id"],
-                "class_name": cls.get("name", "?"),
-                "level": cls.get("level", ""),
-                "note": s.get("note", ""),
-                "schedule_id": s.get("id"),
-            })
-            return True
-
-        if "specific_dates" in s:
-            for ds in s["specific_dates"]:
-                current = _to_date(ds)
-                _emit(current, DAY_NAMES[current.weekday()])
-        elif "day" in s:
-            start = _to_date(s["start_date"])
-            max_lessons = s.get("total_lessons", 99999)
-            if "end_date" in s:
-                end = _to_date(s["end_date"]) + timedelta(days=1)
-            elif "duration_weeks" in s:
-                end = start + timedelta(weeks=s["duration_weeks"])
-            elif "total_lessons" in s:
-                # 只給堂數：展開範圍由 max_lessons 收斂，+52 週緩衝 except_dates
-                end = start + timedelta(weeks=max_lessons + 52)
-            else:
-                end = start + timedelta(weeks=12)
-            target_day = DAY_NAMES.index(s["day"])
-            days_ahead = (target_day - start.weekday()) % 7
-            current = start + timedelta(days=days_ahead)
-            count = 0
-            while current < end and count < max_lessons:
-                if _emit(current, s["day"]):
-                    count += 1
-                current += timedelta(days=7)
-        elif "days" in s:
-            start = _to_date(s["start_date"])
-            target_day_set = set(DAY_NAMES.index(d) for d in s["days"])
-            max_lessons = s.get("total_lessons", 99999)
-            if "end_date" in s:
-                end = _to_date(s["end_date"]) + timedelta(days=1)
-            elif "duration_weeks" in s:
-                end = start + timedelta(weeks=s["duration_weeks"])
-            elif "total_lessons" in s:
-                # 只給堂數：展開範圍由 max_lessons 收斂，+52 週緩衝 except_dates
-                end = start + timedelta(weeks=max_lessons + 52)
-            else:
-                end = start + timedelta(weeks=12)
-            current = start
-            count = 0
-            while current < end and count < max_lessons:
-                if current.weekday() in target_day_set:
-                    if _emit(current, DAY_NAMES[current.weekday()]):
-                        count += 1
-                current += timedelta(days=1)
+    for l in data.get("lessons", []) or []:
+        slot = slots_by_id.get(l.get("slot_id"), {}) if l.get("slot_id") else {}
+        cls = classes_by_id.get(l.get("class_id"), {})
+        d = _to_date(l["date"])
+        expanded.append({
+            "date": d,
+            "day": DAY_NAMES[d.weekday()],
+            "slot_id": l.get("slot_id"),
+            "slot_time": l.get("time") or slot.get("time", "?"),
+            "slot_note": slot.get("note", ""),
+            "class_id": l.get("class_id"),
+            "class_name": cls.get("name", "?"),
+            "level": cls.get("level", ""),
+            "note": l.get("note", ""),
+            "schedule_id": l.get("schedule_id"),
+        })
+    expanded.sort(key=lambda x: (x["date"], x["slot_time"], x["class_id"] or ""))
     return expanded
 
 
@@ -165,7 +96,7 @@ def cmd_today():
     data = load()
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
-    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id, data=data)
     today_lessons = [l for l in all_lessons if l["date"] == date.today()]
     print_lessons(today_lessons, f"今日 ({date.today()})")
 
@@ -174,7 +105,7 @@ def cmd_week():
     data = load()
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
-    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id, data=data)
     today = date.today()
     monday = today - timedelta(days=today.weekday())
     sunday = monday + timedelta(days=6)
@@ -186,7 +117,7 @@ def cmd_month():
     data = load()
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
-    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id, data=data)
     today = date.today()
     month_lessons = [l for l in all_lessons if l["date"].year == today.year and l["date"].month == today.month]
     print_lessons(month_lessons, f"本月 ({today.year}-{today.month:02d})")
@@ -196,7 +127,7 @@ def cmd_day(target_date_str):
     data = load()
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
-    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id, data=data)
     target = _to_date(target_date_str)
     day_lessons = [l for l in all_lessons if l["date"] == target]
     print_lessons(day_lessons, f"{target_date_str} ({DAY_NAMES_ZH[DAY_NAMES[target.weekday()]]})")
@@ -206,7 +137,7 @@ def cmd_class(class_id):
     data = load()
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
-    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id, data=data)
     cls_lessons = [l for l in all_lessons if l["class_id"] == class_id]
     cls = classes_by_id.get(class_id, {})
     title = f"{cls.get('name', class_id)}（{cls.get('level', '')}）"
@@ -217,7 +148,7 @@ def cmd_slot(slot_id):
     data = load()
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
     classes_by_id = {c["id"]: c for c in data.get("classes", [])}
-    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id)
+    all_lessons = expand_schedule(data.get("schedules", []), slots_by_id, classes_by_id, data=data)
     slot_lessons = [l for l in all_lessons if l["slot_id"] == slot_id]
     slot = slots_by_id.get(slot_id, {})
     title = f"{slot.get('time', '?')}（{slot.get('note', '')}）"
