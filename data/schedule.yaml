@@ -528,13 +528,6 @@ lessons:
   time: 15:20-16:20
   slot_id: S7
   note: 成人；週一五 15:20
-- id: L-0051
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-07-24'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0052
   schedule_id: SCH-004
   class_id: STU-03
