@@ -631,6 +631,12 @@ lessons:
   time: 20:10-21:10
   slot_id: S10
   note: 7/27 起每週一三，共10堂
+- id: L-0071
+  schedule_id: SCH-002
+  class_id: STU-01
+  date: '2026-07-30'
+  time: 09:00-10:00
+  slot_id: S3
 - id: L-0067
   schedule_id: SCH-005
   class_id: STU-03
@@ -658,12 +664,6 @@ lessons:
   time: 19:00-20:00
   slot_id: S9
   note: 7/6、7/7、7/8 取消，不補課
-- id: L-0071
-  schedule_id: SCH-002
-  class_id: STU-01
-  date: '2026-07-31'
-  time: 09:00-10:00
-  slot_id: S3
 - id: L-0072
   schedule_id: SCH-012
   class_id: STU-10
