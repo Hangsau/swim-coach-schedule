@@ -548,13 +548,6 @@ lessons:
   time: 14:10-15:10
   slot_id: S6
   note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
-- id: L-0055
-  schedule_id: SCH-012
-  class_id: STU-10
-  date: '2026-07-27'
-  time: 15:20-16:20
-  slot_id: S7
-  note: 成人；週一五 15:20
 - id: L-0056
   schedule_id: SCH-010
   class_id: STU-08
@@ -1309,6 +1302,14 @@ makeups:
   class_id: STU-12
   origin_date: '2026-07-29'
   origin_schedule_id: SCH-015
+  reason: ''
+  status: pending
+  makeup_date: null
+  makeup_lesson_id: null
+- id: MU-007
+  class_id: STU-10
+  origin_date: '2026-07-27'
+  origin_schedule_id: SCH-012
   reason: ''
   status: pending
   makeup_date: null
