@@ -56,11 +56,6 @@ classes:
   weekly_count: 1
   level: 待確認
   note: 每週四代課 17:00-18:00
-- id: STU-08
-  name: 短訓班
-  weekly_count: 5
-  level: 待確認
-  note: 每週一到五 19:00-20:00
 - id: STU-09
   name: 初級班代課S10 星期四
   weekly_count: 1
@@ -135,12 +130,6 @@ schedules:
   time: 17:00-18:00
   label: 週四
   note: 每週四代課
-- id: SCH-010
-  class_id: STU-08
-  slot_id: S9
-  time: 19:00-20:00
-  label: 週一二三四五
-  note: 7/6、7/7、7/8 取消，不補課
 - id: SCH-011
   class_id: STU-09
   slot_id: S10
@@ -548,13 +537,6 @@ lessons:
   time: 14:10-15:10
   slot_id: S6
   note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
-- id: L-0056
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-07-27'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0057
   schedule_id: SCH-016
   class_id: STU-13
@@ -576,13 +558,6 @@ lessons:
   time: 13:00-14:00
   slot_id: S5
   note: 7/6 開始（原本 7/1 取消第一堂），7/1 開始，每週一二三，排到 20 堂結束
-- id: L-0060
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-07-28'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0061
   schedule_id: SCH-001
   class_id: STU-01
@@ -603,13 +578,6 @@ lessons:
   time: 13:00-14:00
   slot_id: S5
   note: 7/6 開始（原本 7/1 取消第一堂），7/1 開始，每週一二三，排到 20 堂結束
-- id: L-0065
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-07-29'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0066
   schedule_id: SCH-016
   class_id: STU-13
@@ -643,13 +611,6 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
-- id: L-0070
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-07-30'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0072
   schedule_id: SCH-012
   class_id: STU-10
@@ -657,13 +618,6 @@ lessons:
   time: 15:20-16:20
   slot_id: S7
   note: 成人；週一五 15:20
-- id: L-0073
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-07-31'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0074
   schedule_id: SCH-014
   class_id: STU-11
@@ -698,13 +652,6 @@ lessons:
   time: 15:20-16:20
   slot_id: S7
   note: 補課（原 2026-07-17）
-- id: L-0079
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-03'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0080
   schedule_id: SCH-016
   class_id: STU-13
@@ -726,13 +673,6 @@ lessons:
   time: 13:00-14:00
   slot_id: S5
   note: 7/6 開始（原本 7/1 取消第一堂），7/1 開始，每週一二三，排到 20 堂結束
-- id: L-0083
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-04'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0084
   schedule_id: SCH-019
   class_id: STU-14
@@ -759,13 +699,6 @@ lessons:
   time: 18:00-19:00
   slot_id: S11
   note: 7/8 起每週三，共10堂
-- id: L-0088
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-05'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0089
   schedule_id: SCH-016
   class_id: STU-13
@@ -793,13 +726,6 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
-- id: L-0093
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-06'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0094
   schedule_id: SCH-019
   class_id: STU-14
@@ -812,13 +738,6 @@ lessons:
   date: '2026-08-07'
   time: 09:00-10:00
   slot_id: S3
-- id: L-0096
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-07'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0097
   schedule_id: SCH-004
   class_id: STU-03
@@ -839,13 +758,6 @@ lessons:
   time: 14:10-15:10
   slot_id: S6
   note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
-- id: L-0100
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-10'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0101
   schedule_id: SCH-016
   class_id: STU-13
@@ -860,13 +772,6 @@ lessons:
   time: 13:00-14:00
   slot_id: S5
   note: 7/6 開始（原本 7/1 取消第一堂），7/1 開始，每週一二三，排到 20 堂結束
-- id: L-0103
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-11'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0104
   schedule_id: SCH-019
   class_id: STU-14
@@ -893,13 +798,6 @@ lessons:
   time: 18:00-19:00
   slot_id: S11
   note: 7/8 起每週三，共10堂
-- id: L-0108
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-12'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0109
   schedule_id: SCH-016
   class_id: STU-13
@@ -927,13 +825,6 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
-- id: L-0113
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-13'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0114
   schedule_id: SCH-019
   class_id: STU-14
@@ -946,13 +837,6 @@ lessons:
   date: '2026-08-14'
   time: 09:00-10:00
   slot_id: S3
-- id: L-0116
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-14'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0117
   schedule_id: SCH-014
   class_id: STU-11
@@ -980,13 +864,6 @@ lessons:
   time: 14:10-15:10
   slot_id: S6
   note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
-- id: L-0121
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-17'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0122
   schedule_id: SCH-016
   class_id: STU-13
@@ -1008,13 +885,6 @@ lessons:
   time: 13:00-14:00
   slot_id: S5
   note: 7/6 開始（原本 7/1 取消第一堂），7/1 開始，每週一二三，排到 20 堂結束
-- id: L-0125
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-18'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0126
   schedule_id: SCH-024
   class_id: STU-14
@@ -1034,13 +904,6 @@ lessons:
   time: 18:00-19:00
   slot_id: S11
   note: 7/8 起每週三，共10堂
-- id: L-0129
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-19'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0130
   schedule_id: SCH-016
   class_id: STU-13
@@ -1068,13 +931,6 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
-- id: L-0134
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-20'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0135
   schedule_id: SCH-023
   class_id: STU-14
@@ -1088,13 +944,6 @@ lessons:
   date: '2026-08-21'
   time: 09:00-10:00
   slot_id: S3
-- id: L-0137
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-21'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0138
   schedule_id: SCH-014
   class_id: STU-11
@@ -1115,13 +964,6 @@ lessons:
   time: 14:10-15:10
   slot_id: S6
   note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
-- id: L-0141
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-24'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0142
   schedule_id: SCH-016
   class_id: STU-13
@@ -1136,13 +978,6 @@ lessons:
   time: 09:00-10:00
   slot_id: S3
   note: 長頸鹿（復興）指定 6 個日期 9:00-10:00
-- id: L-0144
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-25'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0145
   schedule_id: SCH-001
   class_id: STU-01
@@ -1156,13 +991,6 @@ lessons:
   time: 18:00-19:00
   slot_id: S11
   note: 7/8 起每週三，共10堂
-- id: L-0147
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-26'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0148
   schedule_id: SCH-016
   class_id: STU-13
@@ -1190,20 +1018,6 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
-- id: L-0152
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-27'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
-- id: L-0153
-  schedule_id: SCH-010
-  class_id: STU-08
-  date: '2026-08-28'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 7/6、7/7、7/8 取消，不補課
 - id: L-0154
   schedule_id: SCH-014
   class_id: STU-11
