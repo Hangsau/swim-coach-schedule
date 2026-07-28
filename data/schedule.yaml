@@ -564,13 +564,6 @@ lessons:
   date: '2026-07-29'
   time: 09:00-10:00
   slot_id: S3
-- id: L-0062
-  schedule_id: SCH-013
-  class_id: STU-10
-  date: '2026-07-29'
-  time: 10:10-11:10
-  slot_id: S4
-  note: 成人；週三 10:10
 - id: L-0063
   schedule_id: SCH-006
   class_id: STU-04
@@ -611,13 +604,6 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
-- id: L-0072
-  schedule_id: SCH-012
-  class_id: STU-10
-  date: '2026-07-31'
-  time: 15:20-16:20
-  slot_id: S7
-  note: 成人；週一五 15:20
 - id: L-0074
   schedule_id: SCH-014
   class_id: STU-11
@@ -645,13 +631,6 @@ lessons:
   time: 14:10-15:10
   slot_id: S6
   note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
-- id: L-0078
-  schedule_id: SCH-021
-  class_id: STU-10
-  date: '2026-08-03'
-  time: 15:20-16:20
-  slot_id: S7
-  note: 補課（原 2026-07-17）
 - id: L-0080
   schedule_id: SCH-016
   class_id: STU-13
@@ -758,6 +737,12 @@ lessons:
   time: 14:10-15:10
   slot_id: S6
   note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
+- id: L-0162
+  class_id: STU-10
+  date: '2026-08-10'
+  time: 15:20-16:20
+  slot_id: S7
+  note: 補課（原 2026-07-17）
 - id: L-0101
   schedule_id: SCH-016
   class_id: STU-13
@@ -784,6 +769,12 @@ lessons:
   date: '2026-08-12'
   time: 09:00-10:00
   slot_id: S3
+- id: L-0163
+  class_id: STU-10
+  date: '2026-08-12'
+  time: 10:10-11:10
+  slot_id: S4
+  note: 補課（原 2026-07-27）
 - id: L-0106
   schedule_id: SCH-006
   class_id: STU-04
@@ -837,6 +828,12 @@ lessons:
   date: '2026-08-14'
   time: 09:00-10:00
   slot_id: S3
+- id: L-0164
+  class_id: STU-10
+  date: '2026-08-14'
+  time: 15:20-16:20
+  slot_id: S7
+  note: 補課（原 2026-07-29）
 - id: L-0117
   schedule_id: SCH-014
   class_id: STU-11
@@ -864,6 +861,12 @@ lessons:
   time: 14:10-15:10
   slot_id: S6
   note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
+- id: L-0165
+  class_id: STU-10
+  date: '2026-08-17'
+  time: 15:20-16:20
+  slot_id: S7
+  note: 補課（原 2026-07-31）
 - id: L-0122
   schedule_id: SCH-016
   class_id: STU-13
@@ -1094,8 +1097,8 @@ makeups:
   origin_schedule_id: SCH-012
   reason: ''
   status: fulfilled
-  makeup_date: '2026-08-03'
-  makeup_lesson_id: L-0078
+  makeup_date: '2026-08-10'
+  makeup_lesson_id: L-0162
 - id: MU-004
   class_id: STU-14
   origin_date: '2026-07-28'
@@ -1125,6 +1128,22 @@ makeups:
   origin_date: '2026-07-27'
   origin_schedule_id: SCH-012
   reason: ''
-  status: pending
-  makeup_date: null
-  makeup_lesson_id: null
+  status: fulfilled
+  makeup_date: '2026-08-12'
+  makeup_lesson_id: L-0163
+- id: MU-008
+  class_id: STU-10
+  origin_date: '2026-07-29'
+  origin_schedule_id: SCH-013
+  reason: ''
+  status: fulfilled
+  makeup_date: '2026-08-14'
+  makeup_lesson_id: L-0164
+- id: MU-009
+  class_id: STU-10
+  origin_date: '2026-07-31'
+  origin_schedule_id: SCH-012
+  reason: ''
+  status: fulfilled
+  makeup_date: '2026-08-17'
+  makeup_lesson_id: L-0165
