@@ -981,12 +981,6 @@ lessons:
   time: 09:00-10:00
   slot_id: S3
   note: 長頸鹿（復興）指定 6 個日期 9:00-10:00
-- id: L-0155
-  schedule_id: SCH-019
-  class_id: STU-14
-  date: '2026-08-25'
-  time: 20:10-21:10
-  slot_id: S10
 - id: L-0145
   schedule_id: SCH-001
   class_id: STU-01
@@ -1027,12 +1021,6 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
-- id: L-0157
-  schedule_id: SCH-019
-  class_id: STU-14
-  date: '2026-08-27'
-  time: 20:10-21:10
-  slot_id: S10
 - id: L-0154
   schedule_id: SCH-014
   class_id: STU-11
