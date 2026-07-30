@@ -85,6 +85,10 @@ classes:
   name: 精緻班S10二四
   weekly_count: 2
   level: 待確認
+- id: STU-15
+  name: S9短訓班代課
+  weekly_count: 1
+  level: 待確認
 schedules:
 - id: SCH-001
   class_id: STU-01
@@ -198,6 +202,11 @@ schedules:
   slot_id: S10
   time: 20:10-21:10
   label: 指定日期
+- id: SCH-025
+  class_id: STU-15
+  slot_id: S9
+  time: 19:00-20:00
+  label: 週四
 lessons:
 - id: L-0001
   schedule_id: SCH-002
@@ -584,12 +593,6 @@ lessons:
   date: '2026-07-30'
   time: 09:00-10:00
   slot_id: S3
-- id: L-0067
-  schedule_id: SCH-005
-  class_id: STU-03
-  date: '2026-07-30'
-  time: 10:10-11:10
-  slot_id: S4
 - id: L-0068
   schedule_id: SCH-007
   class_id: STU-05
@@ -604,6 +607,12 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
+- id: L-0166
+  schedule_id: SCH-025
+  class_id: STU-15
+  date: '2026-07-30'
+  time: 19:00-20:00
+  slot_id: S9
 - id: L-0074
   schedule_id: SCH-014
   class_id: STU-11
@@ -705,6 +714,12 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
+- id: L-0167
+  schedule_id: SCH-025
+  class_id: STU-15
+  date: '2026-08-06'
+  time: 19:00-20:00
+  slot_id: S9
 - id: L-0094
   schedule_id: SCH-019
   class_id: STU-14
@@ -816,6 +831,12 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
+- id: L-0168
+  schedule_id: SCH-025
+  class_id: STU-15
+  date: '2026-08-13'
+  time: 19:00-20:00
+  slot_id: S9
 - id: L-0114
   schedule_id: SCH-019
   class_id: STU-14
@@ -934,6 +955,12 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
+- id: L-0169
+  schedule_id: SCH-025
+  class_id: STU-15
+  date: '2026-08-20'
+  time: 19:00-20:00
+  slot_id: S9
 - id: L-0135
   schedule_id: SCH-023
   class_id: STU-14
@@ -1021,6 +1048,12 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
+- id: L-0170
+  schedule_id: SCH-025
+  class_id: STU-15
+  date: '2026-08-27'
+  time: 19:00-20:00
+  slot_id: S9
 - id: L-0154
   schedule_id: SCH-014
   class_id: STU-11
