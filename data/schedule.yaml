@@ -1083,29 +1083,35 @@ lessons:
   time: 09:00-10:00
   slot_id: S3
   note: 兒童；週六 9:00；共10堂
-- id: L-0161
-  schedule_id: SCH-018
+- id: L-0171
   class_id: STU-11
   date: '2026-09-19'
   time: 09:00-10:00
   slot_id: S3
+  note: 補課（原 2026-07-25）
+- id: L-0172
+  class_id: STU-11
+  date: '2026-09-26'
+  time: 09:00-10:00
+  slot_id: S3
+  note: 補課（原 2026-08-08）
 makeups:
 - id: MU-001
   class_id: STU-11
   origin_date: '2026-07-25'
   origin_schedule_id: SCH-014
   reason: ''
-  status: pending
-  makeup_date: null
-  makeup_lesson_id: null
+  status: fulfilled
+  makeup_date: '2026-09-19'
+  makeup_lesson_id: L-0171
 - id: MU-002
   class_id: STU-11
   origin_date: '2026-08-08'
   origin_schedule_id: SCH-014
   reason: ''
-  status: pending
-  makeup_date: null
-  makeup_lesson_id: null
+  status: fulfilled
+  makeup_date: '2026-09-26'
+  makeup_lesson_id: L-0172
 - id: MU-003
   class_id: STU-10
   origin_date: '2026-07-17'
