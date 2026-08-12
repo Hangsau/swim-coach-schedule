@@ -818,6 +818,12 @@ lessons:
   time: 14:10-15:10
   slot_id: S6
   note: 7/6 開始，每週一四，排到 16 堂結束（user 修正：原 13 改 16）
+- id: L-0165
+  class_id: STU-10
+  date: '2026-08-13'
+  time: 15:20-16:20
+  slot_id: S7
+  note: 補課（原 2026-07-31）
 - id: L-0112
   schedule_id: SCH-009
   class_id: STU-07
@@ -909,12 +915,6 @@ lessons:
   date: '2026-08-19'
   time: 09:00-10:00
   slot_id: S3
-- id: L-0165
-  class_id: STU-10
-  date: '2026-08-19'
-  time: 10:10-11:10
-  slot_id: S4
-  note: 補課（原 2026-07-31）
 - id: L-0128
   schedule_id: SCH-015
   class_id: STU-12
@@ -1172,5 +1172,5 @@ makeups:
   origin_schedule_id: SCH-012
   reason: ''
   status: fulfilled
-  makeup_date: '2026-08-19'
+  makeup_date: '2026-08-13'
   makeup_lesson_id: L-0165
