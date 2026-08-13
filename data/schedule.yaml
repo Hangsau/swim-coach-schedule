@@ -831,12 +831,6 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
-- id: L-0168
-  schedule_id: SCH-025
-  class_id: STU-15
-  date: '2026-08-13'
-  time: 19:00-20:00
-  slot_id: S9
 - id: L-0114
   schedule_id: SCH-019
   class_id: STU-14
@@ -915,6 +909,11 @@ lessons:
   date: '2026-08-19'
   time: 09:00-10:00
   slot_id: S3
+- id: L-0174
+  class_id: STU-04
+  date: '2026-08-19'
+  time: 13:00-14:00
+  slot_id: S5
 - id: L-0128
   schedule_id: SCH-015
   class_id: STU-12
@@ -981,6 +980,11 @@ lessons:
   date: '2026-08-24'
   time: 10:10-11:10
   slot_id: S4
+- id: L-0175
+  class_id: STU-04
+  date: '2026-08-24'
+  time: 13:00-14:00
+  slot_id: S5
 - id: L-0140
   schedule_id: SCH-007
   class_id: STU-05
@@ -1002,12 +1006,22 @@ lessons:
   time: 09:00-10:00
   slot_id: S3
   note: 長頸鹿（復興）指定 6 個日期 9:00-10:00
+- id: L-0176
+  class_id: STU-04
+  date: '2026-08-25'
+  time: 13:00-14:00
+  slot_id: S5
 - id: L-0145
   schedule_id: SCH-001
   class_id: STU-01
   date: '2026-08-26'
   time: 09:00-10:00
   slot_id: S3
+- id: L-0177
+  class_id: STU-04
+  date: '2026-08-26'
+  time: 13:00-14:00
+  slot_id: S5
 - id: L-0146
   schedule_id: SCH-015
   class_id: STU-12
