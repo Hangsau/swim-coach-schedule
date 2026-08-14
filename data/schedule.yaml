@@ -883,13 +883,6 @@ lessons:
   time: 20:10-21:10
   slot_id: S10
   note: 7/27 起每週一三，共10堂
-- id: L-0123
-  schedule_id: SCH-003
-  class_id: STU-02
-  date: '2026-08-18'
-  time: 09:00-10:00
-  slot_id: S3
-  note: 長頸鹿（復興）指定 6 個日期 9:00-10:00
 - id: L-0124
   schedule_id: SCH-006
   class_id: STU-04
