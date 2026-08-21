@@ -960,12 +960,6 @@ lessons:
   date: '2026-08-21'
   time: 09:00-10:00
   slot_id: S3
-- id: L-0173
-  class_id: STU-12
-  date: '2026-08-21'
-  time: 19:00-20:00
-  slot_id: S9
-  note: 補課（原 2026-07-29）
 - id: L-0138
   schedule_id: SCH-014
   class_id: STU-11
@@ -1096,6 +1090,12 @@ lessons:
   time: 09:00-10:00
   slot_id: S3
   note: 兒童；週六 9:00；共10堂
+- id: L-0173
+  class_id: STU-12
+  date: '2026-09-16'
+  time: 18:00-19:00
+  slot_id: S11
+  note: 補課（原 2026-07-29）
 - id: L-0172
   class_id: STU-11
   date: '2026-09-26'
@@ -1160,7 +1160,7 @@ makeups:
   origin_schedule_id: SCH-015
   reason: ''
   status: fulfilled
-  makeup_date: '2026-08-21'
+  makeup_date: '2026-09-16'
   makeup_lesson_id: L-0173
 - id: MU-007
   class_id: STU-10
