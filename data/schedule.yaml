@@ -1098,7 +1098,7 @@ lessons:
   note: 補課（原 2026-07-29）
 - id: L-0172
   class_id: STU-11
-  date: '2026-09-26'
+  date: '2026-09-19'
   time: 09:00-10:00
   slot_id: S3
   note: 補課（原 2026-08-08）
@@ -1128,7 +1128,7 @@ makeups:
   origin_schedule_id: SCH-014
   reason: ''
   status: fulfilled
-  makeup_date: '2026-09-26'
+  makeup_date: '2026-09-19'
   makeup_lesson_id: L-0172
 - id: MU-003
   class_id: STU-10
