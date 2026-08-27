@@ -1049,12 +1049,6 @@ lessons:
   time: 17:00-18:00
   slot_id: S8
   note: 每週四代課
-- id: L-0170
-  schedule_id: SCH-025
-  class_id: STU-15
-  date: '2026-08-27'
-  time: 19:00-20:00
-  slot_id: S9
 - id: L-0154
   schedule_id: SCH-014
   class_id: STU-11
