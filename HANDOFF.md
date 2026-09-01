@@ -1,14 +1,22 @@
 # HANDOFF — swim-coach-schedule
 
 > 狀態快照（每次實質推進後更新）。行為規範見 `CLAUDE.md`，結構見 `MAP.md`。
-> `updated: 2026-07-22`
+> `updated: 2026-09-01`
 
 ## 現況
 
-- schema v4；`lessons` 是唯一課次真相，`schedules` 只保留分組 metadata；現況 13 班、21 組排課、161 堂、2 筆 pending makeup
+- schema v4；`lessons` 是唯一課次真相，`schedules` 只保留分組 metadata；現況 19 班、26 組排課、167 堂、0 筆 pending makeup
 - CLI 維持 19 個子命令與既有 JSON envelope；取消直接刪 lesson、挪課原地改 lesson、補課以 `makeup_lesson_id` 銷帳
 - CI（build.yml）：push main → strict validate + pytest + rebuild docs（drift 時 bot auto-commit）→ pages.yml 部署
 - 線上版：https://hangsau.github.io/swim-coach-schedule/
+
+## 本次（2026-09-01）：快速插課＋僑泰代課
+
+- `add-lesson` 新增 `--name` 模式：唯一同名班級自動沿用，找不到則自動編 STU id；class 與 standalone lesson 放在同一份 `new_data` 經 dry-run／validate／atomic_write，撞課或畸形輸入不留孤兒班，一次 undo 同時復原
+- 多筆同名回 `E_AMBIGUOUS_TARGET` 並列 candidates，必須改用 `--class`；既有 `add-lesson --class` 完全相容
+- GUI 頭列新增「快速插課」，日期空白處選單也有入口；單一表單只需班名、日期、常用／自訂時段與備註，確認框明示自動建立或沿用的班級
+- 新增 7 項 CLI 測試：dry-run 不寫、原子建班、同名沿用、多筆同名、撞課不留孤兒、空白／畸形輸入、undo；全套 106 → 113 tests
+- 以新功能實際加入 `STU-21 僑泰(容二乙)代課`：2026-09-29，S4 10:10-11:10，standalone `L-0209`
 
 ## 本次（2026-07-22）：schema v4 明確課次模型
 
