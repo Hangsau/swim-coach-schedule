@@ -89,6 +89,26 @@ classes:
   name: S9短訓班代課
   weekly_count: 1
   level: 待確認
+- id: STU-16
+  name: 益民(502 608)
+  weekly_count: 1
+  level: 待確認
+- id: STU-17
+  name: 益民(602 605)
+  weekly_count: 1
+  level: 待確認
+- id: STU-18
+  name: 益民(304 402)
+  weekly_count: 1
+  level: 待確認
+- id: STU-19
+  name: 益民(601 609)
+  weekly_count: 1
+  level: 待確認
+- id: STU-20
+  name: 四德
+  weekly_count: 1
+  level: 待確認
 schedules:
 - id: SCH-001
   class_id: STU-01
@@ -207,6 +227,30 @@ schedules:
   slot_id: S9
   time: 19:00-20:00
   label: 週四
+- id: SCH-026
+  class_id: STU-16
+  slot_id: S5
+  time: 13:00-14:00
+  label: 指定日期
+- id: SCH-027
+  class_id: STU-17
+  slot_id: S5
+  time: 13:00-14:00
+  label: 指定日期
+- id: SCH-028
+  class_id: STU-18
+  time: 10:00-11:00
+  label: 指定日期
+- id: SCH-029
+  class_id: STU-19
+  slot_id: S5
+  time: 13:00-14:00
+  label: 指定日期
+- id: SCH-030
+  class_id: STU-20
+  slot_id: S5
+  time: 13:00-14:00
+  label: 指定日期
 lessons:
 - id: L-0001
   schedule_id: SCH-002
@@ -1070,6 +1114,18 @@ lessons:
   time: 09:00-10:00
   slot_id: S3
   note: 兒童；週六 9:00；共10堂
+- id: L-0180
+  schedule_id: SCH-026
+  class_id: STU-16
+  date: '2026-09-07'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0186
+  schedule_id: SCH-027
+  class_id: STU-17
+  date: '2026-09-08'
+  time: 13:00-14:00
+  slot_id: S5
 - id: L-0159
   schedule_id: SCH-015
   class_id: STU-12
@@ -1077,6 +1133,23 @@ lessons:
   time: 18:00-19:00
   slot_id: S11
   note: 7/8 起每週三，共10堂
+- id: L-0192
+  schedule_id: SCH-028
+  class_id: STU-18
+  date: '2026-09-10'
+  time: 10:00-11:00
+- id: L-0198
+  schedule_id: SCH-029
+  class_id: STU-19
+  date: '2026-09-10'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0204
+  schedule_id: SCH-030
+  class_id: STU-20
+  date: '2026-09-11'
+  time: 13:00-14:00
+  slot_id: S5
 - id: L-0160
   schedule_id: SCH-014
   class_id: STU-11
@@ -1084,29 +1157,168 @@ lessons:
   time: 09:00-10:00
   slot_id: S3
   note: 兒童；週六 9:00；共10堂
+- id: L-0181
+  schedule_id: SCH-026
+  class_id: STU-16
+  date: '2026-09-14'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0187
+  schedule_id: SCH-027
+  class_id: STU-17
+  date: '2026-09-15'
+  time: 13:00-14:00
+  slot_id: S5
 - id: L-0173
   class_id: STU-12
   date: '2026-09-16'
   time: 18:00-19:00
   slot_id: S11
   note: 補課（原 2026-07-29）
+- id: L-0193
+  schedule_id: SCH-028
+  class_id: STU-18
+  date: '2026-09-17'
+  time: 10:00-11:00
+- id: L-0199
+  schedule_id: SCH-029
+  class_id: STU-19
+  date: '2026-09-17'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0205
+  schedule_id: SCH-030
+  class_id: STU-20
+  date: '2026-09-18'
+  time: 13:00-14:00
+  slot_id: S5
 - id: L-0172
   class_id: STU-11
   date: '2026-09-19'
   time: 09:00-10:00
   slot_id: S3
   note: 補課（原 2026-08-08）
+- id: L-0182
+  schedule_id: SCH-026
+  class_id: STU-16
+  date: '2026-09-21'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0188
+  schedule_id: SCH-027
+  class_id: STU-17
+  date: '2026-09-22'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0194
+  schedule_id: SCH-028
+  class_id: STU-18
+  date: '2026-09-24'
+  time: 10:00-11:00
+- id: L-0200
+  schedule_id: SCH-029
+  class_id: STU-19
+  date: '2026-09-24'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0189
+  schedule_id: SCH-027
+  class_id: STU-17
+  date: '2026-09-29'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0195
+  schedule_id: SCH-028
+  class_id: STU-18
+  date: '2026-10-01'
+  time: 10:00-11:00
+- id: L-0201
+  schedule_id: SCH-029
+  class_id: STU-19
+  date: '2026-10-01'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0206
+  schedule_id: SCH-030
+  class_id: STU-20
+  date: '2026-10-02'
+  time: 13:00-14:00
+  slot_id: S5
 - id: L-0178
   class_id: STU-11
   date: '2026-10-03'
   time: 09:00-10:00
   slot_id: S3
   note: 補課（原 2026-07-25）
+- id: L-0183
+  schedule_id: SCH-026
+  class_id: STU-16
+  date: '2026-10-05'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0190
+  schedule_id: SCH-027
+  class_id: STU-17
+  date: '2026-10-06'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0196
+  schedule_id: SCH-028
+  class_id: STU-18
+  date: '2026-10-08'
+  time: 10:00-11:00
+- id: L-0202
+  schedule_id: SCH-029
+  class_id: STU-19
+  date: '2026-10-08'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0184
+  schedule_id: SCH-026
+  class_id: STU-16
+  date: '2026-10-12'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0191
+  schedule_id: SCH-027
+  class_id: STU-17
+  date: '2026-10-13'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0197
+  schedule_id: SCH-028
+  class_id: STU-18
+  date: '2026-10-15'
+  time: 10:00-11:00
+- id: L-0203
+  schedule_id: SCH-029
+  class_id: STU-19
+  date: '2026-10-15'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0207
+  schedule_id: SCH-030
+  class_id: STU-20
+  date: '2026-10-16'
+  time: 13:00-14:00
+  slot_id: S5
 - id: L-0179
   class_id: STU-11
   date: '2026-10-17'
   time: 09:00-10:00
   slot_id: S3
+- id: L-0185
+  schedule_id: SCH-026
+  class_id: STU-16
+  date: '2026-10-19'
+  time: 13:00-14:00
+  slot_id: S5
+- id: L-0208
+  schedule_id: SCH-030
+  class_id: STU-20
+  date: '2026-10-23'
+  time: 13:00-14:00
+  slot_id: S5
 makeups:
 - id: MU-001
   class_id: STU-11
