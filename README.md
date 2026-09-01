@@ -66,8 +66,9 @@ pythonw scripts\schedule_gui.py
 ```
 
 - **月曆是主視圖**（與線上頁同一套展開邏輯）：
+  - 頭列 **「快速插課」** → 只填課程／班名、日期、時段與備註；唯一同名班級自動沿用，找不到時自動建班並加入單堂課
   - **點一堂課** → 選單：取消這天這堂／挪到別天換時段／這班臨時加一堂／修改班級／刪除排課／刪除班級
-  - **點空白日** → 選單：幫既有班在這天加一堂／建立全新班級（兩步精靈，中途放棄自動撤銷、不留孤兒班）
+  - **點日期空白處** → 選單：快速插入新課程／幫既有班加一堂／建立固定排課的新班級（兩步精靈，中途放棄自動撤銷、不留孤兒班）
   - 一天超過 3 堂收成「+N 堂…」，點開列全滿再選
   - 衝突日日期數字標紅；撞課錯誤訊息會寫成人話（撞到哪班、哪個時段）
 - **頭列「班級 ▾」** → 班級列表（每班顯示每週堂數與未來堂數；還欠補課時整列紅字標「⚠ 欠補 N 堂」），點一班 → **班級詳情面板**：
@@ -183,7 +184,7 @@ python scripts/schedule_cli.py --json add-schedule --class STU-04 --slot S5 --da
 | `fulfill-makeup --makeup-id --date (--slot\|--time) [--note]` | 銷帳一筆待補課：新增 standalone lesson 並把該筆標記 fulfilled | 是 |
 | `list-makeups [--class] [--status pending\|fulfilled\|all]` | 列待補課（預設只列 pending） | 否 |
 | `cancel-makeup --makeup-id` | 撤銷一筆待補課登記（不再欠補；不影響已取消的原課） | 是 |
-| `add-lesson --class --date (--slot\|--time) [--note]` | 臨時加一堂（單日） | 是 |
+| `add-lesson (--class\|--name) --date (--slot\|--time) [--note]` | 臨時加一堂；`--name` 會沿用唯一同名班級，找不到則原子地自動建班＋加課 | 是 |
 | `split-schedule (--class\|--schedule-id) --at --(day\|days) [--to-slot\|--to-time] (--weeks\|--end\|--lessons) [--note]` | 把某 schedule 在某日切兩半，過去不動、未來改 | 是 |
 
 ### 待補課帳本（makeups）
@@ -195,6 +196,22 @@ python scripts/schedule_cli.py --json add-schedule --class STU-04 --slot S5 --da
 3. 隨時 `list-makeups` 看還欠哪幾堂；登記錯了用 `cancel-makeup --makeup-id MU-NNN` 撤銷
 
 `makeups` 是 optional 頂層 list，每筆 `{id, class_id, origin_date, origin_schedule_id, reason, status, makeup_date, makeup_lesson_id}`。若已銷帳的補課 lesson 被刪除，原 MU 會自動回到 pending；再次選「取消並登記待補」也不會重複記兩筆。GUI 班級詳情面板會用紅字顯示「還欠 N 堂補課」。
+
+### 快速插課
+
+不想先建立班級時，直接用課程名稱加入單堂課：
+
+```bash
+# dry-run：若班名不存在，預覽會同時顯示新 class 與新 lesson
+python scripts/schedule_cli.py --json add-lesson --name "僑泰(容二乙)代課" \
+  --date 2026-09-29 --slot S4
+
+# 確認沒有 E_TIME_OVERLAP 後才寫入
+python scripts/schedule_cli.py --json add-lesson --name "僑泰(容二乙)代課" \
+  --date 2026-09-29 --slot S4 --apply
+```
+
+名稱比對會先去除頭尾空白後做完整相等比較：唯一同名班級會沿用；沒有同名班級會自動建立；多筆同名時回 `E_AMBIGUOUS_TARGET`，必須改用 `--class <ID>` 指定。自動建班與加課使用同一次原子寫入，因此撞課或驗證失敗不會留下孤兒班；一次 `undo` 也會同時復原兩者。
 
 ### 錯誤碼處理表
 

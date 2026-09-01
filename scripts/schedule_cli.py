@@ -1083,15 +1083,49 @@ def cmd_cancel_makeup(args):
 
 
 def cmd_add_lesson(args):
-    """臨時加一堂：直接加一筆 standalone lesson"""
+    """臨時加一堂：可指定既有 class，或按名稱自動建班／沿用後加入。"""
     data = load_yaml(args.file)
     classes = data.get("classes", []) or []
     slots = data.get("slots", []) or []
-    if not any(c.get("id") == args.class_id for c in classes):
-        emit(envelope(False,
-                      errors=[_err("E_CLASS_NOT_FOUND", f"class {args.class_id} 不存在",
-                                   available=[c.get("id") for c in classes])]),
-             args.json)
+    new_class = None
+    reused_class = None
+    if args.name is not None:
+        class_name = args.name.strip()
+        if not class_name:
+            emit(envelope(False,
+                          errors=[_err("E_SCHEMA_INVALID", "--name 不可為空白")]),
+                 args.json)
+        matches = [c for c in classes
+                   if str(c.get("name", "")).strip() == class_name]
+        if len(matches) > 1:
+            emit(envelope(False,
+                          errors=[_err(
+                              "E_AMBIGUOUS_TARGET",
+                              f"班名「{class_name}」有 {len(matches)} 筆，無法自動判斷",
+                              candidates=[{"id": c.get("id"), "name": c.get("name")}
+                                          for c in matches],
+                          )],
+                          next_actions=["改用 --class <ID> 指定既有班級，或換一個新班名"]),
+                 args.json)
+        if matches:
+            reused_class = matches[0]
+            class_id = reused_class.get("id")
+        else:
+            class_id = next_class_id(classes)
+            new_class = {
+                "id": class_id,
+                "name": class_name,
+                "weekly_count": 1,
+                "level": "待確認",
+            }
+    else:
+        class_id = args.class_id
+        reused_class = next((c for c in classes if c.get("id") == class_id), None)
+        if reused_class is None:
+            emit(envelope(False,
+                          errors=[_err("E_CLASS_NOT_FOUND", f"class {class_id} 不存在",
+                                       available=[c.get("id") for c in classes])]),
+                 args.json)
     if _parse_date_safe(args.date) is None:
         emit(envelope(False,
                       errors=[_err("E_SCHEMA_INVALID",
@@ -1114,12 +1148,25 @@ def cmd_add_lesson(args):
         time_str = slot_def.get("time")
         slot_id = args.slot_id
     new_data = copy.deepcopy(data)
+    if new_class is not None:
+        new_data.setdefault("classes", []).append(new_class)
     new_lesson = _alloc_lessons(data.get("lessons", []) or [], [args.date],
-                                class_id=args.class_id, time_str=time_str,
+                                class_id=class_id, time_str=time_str,
                                 slot_id=slot_id, note=args.note)[0]
     new_data.setdefault("lessons", []).append(new_lesson)
     _sort_lessons(new_data["lessons"])
-    _commit_or_preview(args, new_data, {"added_lesson": new_lesson})
+    success = {"added_lesson": new_lesson}
+    if args.name is not None:
+        if new_class is not None:
+            success["added_class"] = new_class
+            success["class_resolution"] = "created"
+        else:
+            success["reused_class"] = {
+                "id": reused_class.get("id"),
+                "name": reused_class.get("name"),
+            }
+            success["class_resolution"] = "reused"
+    _commit_or_preview(args, new_data, success)
 
 
 def cmd_update_schedule(args):
@@ -1571,7 +1618,9 @@ def build_parser():
     cm.add_argument("--apply", action="store_true")
 
     al = sub.add_parser("add-lesson", help="臨時加一堂（單日 standalone lesson）")
-    al.add_argument("--class", dest="class_id", required=True)
+    al_target = al.add_mutually_exclusive_group(required=True)
+    al_target.add_argument("--class", dest="class_id", help="指定既有 class id")
+    al_target.add_argument("--name", help="快速插課：按班名沿用唯一同名班級，找不到就自動建立")
     al.add_argument("--date", required=True, help="新加課的日期 YYYY-MM-DD")
     al.add_argument("--slot", dest="slot_id", help="常用時段別名")
     al.add_argument("--time", help="HH:MM-HH:MM 直接寫")

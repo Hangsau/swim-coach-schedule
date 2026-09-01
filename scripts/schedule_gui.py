@@ -315,6 +315,14 @@ class ConfirmDialog(tk.Toplevel):
                  font=F_SEC, anchor="w").pack(fill="x")
 
         resp_data = resp.get("data") or {}
+        if resp_data.get("class_resolution"):
+            class_rec = resp_data.get("added_class") or resp_data.get("reused_class") or {}
+            lesson = resp_data.get("added_lesson") or {}
+            action = "自動建立" if resp_data["class_resolution"] == "created" else "沿用"
+            summary = (f"{action}班級 {class_rec.get('id', '')}「{class_rec.get('name', '')}」；"
+                       f"加入 {lesson.get('date', '')} {lesson.get('time', '')}")
+            tk.Label(self, text=summary, bg=BG, fg=PROG, font=F_SMALL,
+                     anchor="w", wraplength=600, justify="left").pack(fill="x")
         if "kept_lessons" in resp_data:
             summary = (f"保留已上 {resp_data['kept_lessons']} 堂／"
                        f"移除未來 {resp_data['removed_lessons']} 堂")
@@ -432,6 +440,12 @@ class SwimTab(tk.Frame):
         more_btn.pack(side="right", padx=4)
         self._more_btn = more_btn
         make_btn(nav, "班級 ▾", self._class_panel).pack(side="right", padx=4)
+        make_btn(
+            nav, "快速插課",
+            lambda: self._form_then_run(
+                "快速插課", "add-lesson", self._fields_quick_add_lesson()),
+            color=TRACK,
+        ).pack(side="right", padx=4)
         make_btn(nav, "今天", self._goto_today).pack(side="right", padx=4)
         self.month_lbl = tk.Label(nav, text="", bg=BG, fg=HEAD, font=F_SEC)
         self.month_lbl.pack(side="right", padx=6)
@@ -662,6 +676,17 @@ class SwimTab(tk.Frame):
             {"flag": "--class", "label": "班級", "kind": "combo",
              "values": self._class_values(), "value": class_value,
              "required": True},
+            {"flag": "--date", "label": "日期", "kind": "date",
+             "value": date_value, "required": True, "hint": "YYYY-MM-DD"},
+            *self._slot_time_fields(),
+            {"flag": "--note", "label": "備註", "kind": "entry"},
+        ]
+
+    def _fields_quick_add_lesson(self, date_value=""):
+        return [
+            {"flag": "--name", "label": "課程 / 班名", "kind": "entry",
+             "required": True,
+             "hint": "同名班級只有一筆時會自動沿用；找不到就自動建立"},
             {"flag": "--date", "label": "日期", "kind": "date",
              "value": date_value, "required": True, "hint": "YYYY-MM-DD"},
             *self._slot_time_fields(),
@@ -908,6 +933,11 @@ class SwimTab(tk.Frame):
         menu = tk.Menu(self, tearoff=0, bg=PANEL, fg=FG, activebackground=TRACK,
                        activeforeground=FG, font=F_ROW)
         menu.add_command(label=str(day), state="disabled")
+        menu.add_separator()
+        menu.add_command(label="快速插入新課程",
+                         command=lambda: self._form_then_run(
+                             "快速插課", "add-lesson",
+                             self._fields_quick_add_lesson(date_value=str(day))))
         menu.add_separator()
         menu.add_command(label="幫既有班在這天加一堂",
                          command=lambda: self._form_then_run(

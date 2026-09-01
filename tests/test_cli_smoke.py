@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from conftest import codes, monday, read_yaml, run_cli
+from conftest import codes, monday, read_yaml, run_cli, write_yaml
 
 
 def assert_clean(cp, payload):
@@ -81,6 +81,91 @@ def test_add_lesson_unknown_class(v4_yaml):
                     "--time", "17:00-18:00")
     assert "E_CLASS_NOT_FOUND" in codes(p)
     assert_clean(cp, p)
+
+
+def test_quick_add_lesson_dry_run_creates_class_without_writing(v4_yaml):
+    before = v4_yaml.read_bytes()
+    d = str(monday(5) + timedelta(days=2))
+    cp, p = run_cli(v4_yaml, "add-lesson", "--name", "僑泰(容二乙)代課",
+                    "--date", d, "--slot", "S2")
+    assert cp.returncode == 0 and p["ok"] and p["data"]["preview"] is True
+    assert p["data"]["class_resolution"] == "created"
+    assert p["data"]["added_class"]["name"] == "僑泰(容二乙)代課"
+    assert p["data"]["added_lesson"]["class_id"] == p["data"]["added_class"]["id"]
+    assert v4_yaml.read_bytes() == before
+
+
+def test_quick_add_lesson_apply_then_reuse_exact_name(v4_yaml):
+    before = read_yaml(v4_yaml)
+    d1 = str(monday(5) + timedelta(days=2))
+    d2 = str(monday(6) + timedelta(days=2))
+    _, first = run_cli(v4_yaml, "add-lesson", "--name", "僑泰(容二乙)代課",
+                       "--date", d1, "--slot", "S2", "--apply")
+    cid = first["data"]["added_class"]["id"]
+    _, second = run_cli(v4_yaml, "add-lesson", "--name", "僑泰(容二乙)代課",
+                        "--date", d2, "--slot", "S2", "--apply")
+    after = read_yaml(v4_yaml)
+    matches = [c for c in after["classes"] if c["name"] == "僑泰(容二乙)代課"]
+    lessons = [l for l in after["lessons"] if l["class_id"] == cid]
+    assert first["ok"] and first["data"]["class_resolution"] == "created"
+    assert second["ok"] and second["data"]["class_resolution"] == "reused"
+    assert second["data"]["reused_class"]["id"] == cid
+    assert len(matches) == 1 and len(lessons) == 2
+    assert len(after["classes"]) == len(before["classes"]) + 1
+
+
+def test_quick_add_duplicate_name_is_ambiguous_and_clean(tmp_path, v4_data):
+    v4_data["classes"][1]["name"] = v4_data["classes"][0]["name"]
+    path = write_yaml(tmp_path, v4_data)
+    before = path.read_bytes()
+    cp, p = run_cli(path, "add-lesson", "--name", "A class",
+                    "--date", str(monday(5)), "--slot", "S3", "--apply")
+    assert cp.returncode != 0 and "E_AMBIGUOUS_TARGET" in codes(p)
+    assert len(p["errors"][0]["context"]["candidates"]) == 2
+    assert path.read_bytes() == before
+    assert_clean(cp, p)
+
+
+def test_quick_add_overlap_does_not_leave_orphan_class(v4_yaml):
+    before = v4_yaml.read_bytes()
+    occupied_date = read_yaml(v4_yaml)["lessons"][0]["date"]
+    cp, p = run_cli(v4_yaml, "add-lesson", "--name", "撞課新班",
+                    "--date", occupied_date, "--slot", "S1", "--apply")
+    assert cp.returncode != 0 and "E_TIME_OVERLAP" in codes(p)
+    assert v4_yaml.read_bytes() == before
+    assert_clean(cp, p)
+
+
+def test_quick_add_blank_name_is_clean_error(v4_yaml):
+    before = v4_yaml.read_bytes()
+    cp, p = run_cli(v4_yaml, "add-lesson", "--name", "   ",
+                    "--date", str(monday(5)), "--slot", "S3")
+    assert cp.returncode != 0 and "E_SCHEMA_INVALID" in codes(p)
+    assert v4_yaml.read_bytes() == before
+    assert_clean(cp, p)
+
+
+def test_quick_add_invalid_date_or_missing_time_is_clean(v4_yaml):
+    before = v4_yaml.read_bytes()
+    cases = [
+        ("--date", "not-a-date", "--slot", "S3"),
+        ("--date", str(monday(5))),
+    ]
+    for extra in cases:
+        cp, p = run_cli(v4_yaml, "add-lesson", "--name", "錯誤輸入", *extra)
+        assert cp.returncode != 0 and "E_SCHEMA_INVALID" in codes(p)
+        assert v4_yaml.read_bytes() == before
+        assert_clean(cp, p)
+
+
+def test_quick_add_undo_restores_class_and_lesson_together(v4_yaml):
+    before = read_yaml(v4_yaml)
+    d = str(monday(5) + timedelta(days=2))
+    _, added = run_cli(v4_yaml, "add-lesson", "--name", "一次性代課",
+                       "--date", d, "--slot", "S3", "--apply")
+    _, undone = run_cli(v4_yaml, "undo", "--apply")
+    assert added["ok"] and undone["ok"]
+    assert read_yaml(v4_yaml) == before
 
 
 def test_cancel_missing_lesson_error(v4_yaml):
