@@ -239,8 +239,9 @@ schedules:
   label: 指定日期
 - id: SCH-028
   class_id: STU-18
-  time: 10:00-11:00
+  time: 10:10-11:10
   label: 指定日期
+  slot_id: S4
 - id: SCH-029
   class_id: STU-19
   slot_id: S5
@@ -1137,7 +1138,8 @@ lessons:
   schedule_id: SCH-028
   class_id: STU-18
   date: '2026-09-10'
-  time: 10:00-11:00
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0198
   schedule_id: SCH-029
   class_id: STU-19
@@ -1179,7 +1181,8 @@ lessons:
   schedule_id: SCH-028
   class_id: STU-18
   date: '2026-09-17'
-  time: 10:00-11:00
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0199
   schedule_id: SCH-029
   class_id: STU-19
@@ -1214,7 +1217,8 @@ lessons:
   schedule_id: SCH-028
   class_id: STU-18
   date: '2026-09-24'
-  time: 10:00-11:00
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0200
   schedule_id: SCH-029
   class_id: STU-19
@@ -1231,7 +1235,8 @@ lessons:
   schedule_id: SCH-028
   class_id: STU-18
   date: '2026-10-01'
-  time: 10:00-11:00
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0201
   schedule_id: SCH-029
   class_id: STU-19
@@ -1266,7 +1271,8 @@ lessons:
   schedule_id: SCH-028
   class_id: STU-18
   date: '2026-10-08'
-  time: 10:00-11:00
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0202
   schedule_id: SCH-029
   class_id: STU-19
@@ -1289,7 +1295,8 @@ lessons:
   schedule_id: SCH-028
   class_id: STU-18
   date: '2026-10-15'
-  time: 10:00-11:00
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0203
   schedule_id: SCH-029
   class_id: STU-19
