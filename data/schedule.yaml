@@ -113,6 +113,10 @@ classes:
   name: 僑泰(容二乙)代課
   weekly_count: 1
   level: 待確認
+- id: STU-22
+  name: 僑泰國二7(代課)
+  weekly_count: 1
+  level: 待確認
 schedules:
 - id: SCH-001
   class_id: STU-01
@@ -1229,6 +1233,10 @@ lessons:
   date: '2026-09-24'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0210
+  class_id: STU-22
+  date: '2026-09-29'
+  time: 08:00-09:00
 - id: L-0209
   class_id: STU-21
   date: '2026-09-29'
