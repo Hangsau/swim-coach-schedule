@@ -1197,12 +1197,6 @@ lessons:
   date: '2026-09-17'
   time: 13:00-14:00
   slot_id: S5
-- id: L-0205
-  schedule_id: SCH-030
-  class_id: STU-20
-  date: '2026-09-18'
-  time: 13:00-14:00
-  slot_id: S5
 - id: L-0172
   class_id: STU-11
   date: '2026-09-19'
