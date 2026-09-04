@@ -7,6 +7,7 @@ thin client：所有寫入走 schedule_cli.py subprocess（dry-run → --apply �
 
 互動模式：
   - 月曆是主視圖；點一堂課 → 選單（取消／挪課／加一堂／改班級／刪排課／刪班級）
+  - 頭列「臨時加一堂」 → 只填班名／日期／時間；同名沿用，新名自動建班
   - 點空白日 → 選單（幫既有班加一堂／新班級精靈）
   - 新班級精靈中途放棄自動 rollback，避免孤兒班
   - E_TIME_OVERLAP 錯誤訊息人話化
@@ -218,7 +219,7 @@ class FormDialog(tk.Toplevel):
     submit 後 self.result = {flag: str_value 或 True(check)}；空欄位不進 result。
     """
 
-    def __init__(self, parent, title, fields):
+    def __init__(self, parent, title, fields, submit_text="下一步（先看 diff）"):
         super().__init__(parent)
         self.title(title)
         self.configure(bg=BG, padx=16, pady=12)
@@ -274,7 +275,7 @@ class FormDialog(tk.Toplevel):
         btns = tk.Frame(self, bg=BG)
         btns.grid(row=r + 1, column=0, columnspan=2, sticky="e", pady=(10, 0))
         make_btn(btns, "取消", self.destroy, color=PANEL).pack(side="left", padx=4)
-        make_btn(btns, "下一步（先看 diff）", self._submit).pack(side="left", padx=4)
+        make_btn(btns, submit_text, self._submit).pack(side="left", padx=4)
         self.wait_visibility()
         self.grab_set()
         self.focus_set()
@@ -309,18 +310,23 @@ class ConfirmDialog(tk.Toplevel):
         self.geometry("640x480")
 
         ok = bool(resp.get("ok"))
-        head = "✔ dry-run 通過，確認 diff 後寫入" if ok and on_confirm else \
-               ("✔ 完成" if ok else "✘ 有錯誤，未寫入")
+        resp_data = resp.get("data") or {}
+        quick_lesson = bool(resp_data.get("class_resolution"))
+        if ok and on_confirm:
+            head = ("✔ 課程資料正確，確認後加入"
+                    if quick_lesson else "✔ dry-run 通過，確認 diff 後寫入")
+        else:
+            head = "✔ 完成" if ok else "✘ 有錯誤，未寫入"
         tk.Label(self, text=f"{title}　{head}", bg=BG, fg=(DONE if ok else BAD),
                  font=F_SEC, anchor="w").pack(fill="x")
 
-        resp_data = resp.get("data") or {}
         if resp_data.get("class_resolution"):
             class_rec = resp_data.get("added_class") or resp_data.get("reused_class") or {}
             lesson = resp_data.get("added_lesson") or {}
             action = "自動建立" if resp_data["class_resolution"] == "created" else "沿用"
             summary = (f"{action}班級 {class_rec.get('id', '')}「{class_rec.get('name', '')}」；"
-                       f"加入 {lesson.get('date', '')} {lesson.get('time', '')}")
+                       f"加入 {lesson.get('date', '')} {lesson.get('time', '')}。"
+                       "只會新增這一堂，不會建立每週固定排課。")
             tk.Label(self, text=summary, bg=BG, fg=PROG, font=F_SMALL,
                      anchor="w", wraplength=600, justify="left").pack(fill="x")
         if "kept_lessons" in resp_data:
@@ -391,7 +397,8 @@ class ConfirmDialog(tk.Toplevel):
         btns.pack(fill="x", pady=(8, 0))
         make_btn(btns, "關閉", self.destroy, color=PANEL).pack(side="right", padx=4)
         if ok and on_confirm:
-            make_btn(btns, "確認寫入（--apply）",
+            confirm_text = "確認加入這一堂" if quick_lesson else "確認寫入（--apply）"
+            make_btn(btns, confirm_text,
                      lambda: (self.destroy(), on_confirm()),
                      color=DONE, fg=DARK_TEXT).pack(side="right", padx=4)
         self.wait_visibility()
@@ -440,12 +447,15 @@ class SwimTab(tk.Frame):
         more_btn.pack(side="right", padx=4)
         self._more_btn = more_btn
         make_btn(nav, "班級 ▾", self._class_panel).pack(side="right", padx=4)
-        make_btn(
-            nav, "快速插課",
+        quick_btn = make_btn(
+            nav, "＋ 臨時加一堂",
             lambda: self._form_then_run(
-                "快速插課", "add-lesson", self._fields_quick_add_lesson()),
-            color=TRACK,
-        ).pack(side="right", padx=4)
+                "臨時加一堂", "add-lesson", self._fields_quick_add_lesson()),
+            color=DONE, fg=DARK_TEXT,
+        )
+        quick_btn.configure(pady=6)
+        quick_btn.pack(side="right", padx=4)
+        self.quick_btn = quick_btn
         make_btn(nav, "今天", self._goto_today).pack(side="right", padx=4)
         self.month_lbl = tk.Label(nav, text="", bg=BG, fg=HEAD, font=F_SEC)
         self.month_lbl.pack(side="right", padx=6)
@@ -485,7 +495,7 @@ class SwimTab(tk.Frame):
                                    relief="flat", font=F_ROW)
         self.commit_msg.pack(side="left", fill="x", expand=True, padx=(0, 8))
         self.push_btn = make_btn(push_row, "一鍵上線（render + push）",
-                                 self.push_flow, color=DONE, fg=DARK_TEXT)
+                                 self.push_flow)
         self.push_btn.pack(side="left", padx=4)
         self.push_lbl = tk.Label(push_row, text="", bg=BG, fg=MUTED, font=F_SMALL,
                                  anchor="w", wraplength=520, justify="left")
@@ -515,7 +525,11 @@ class SwimTab(tk.Frame):
                 raw_makeups = data.get("makeups") or []
                 lessons = expand_schedule(
                     raw_schedules, slots_by_id, classes_by_id, data=data)
-                g_dirty = run_cmd(["git", "status", "--porcelain"])
+                # 一鍵上線只會提交 data/docs；其他程式碼或未追蹤檔不應讓
+                # 「上線」長期假性亮起。
+                g_dirty = run_cmd([
+                    "git", "status", "--porcelain", "--", "data/", "docs/",
+                ])
                 ahead = git_ahead()
                 self.after(0, lambda: self._render(
                     status, classes, slots, lessons, g_dirty, ahead,
@@ -562,6 +576,8 @@ class SwimTab(tk.Frame):
             git_txt = "✓ 乾淨"
         self.git_lbl.config(text=git_txt,
                             fg=(PROG if (dirty or ahead) else MUTED))
+
+        self._set_action_emphasis(publish_ready=(dirty or bool(ahead)))
 
         self._classes = (classes.get("data") or {}).get("classes") or []
         self._slots = (slots.get("data") or {}).get("slots") or []
@@ -651,8 +667,22 @@ class SwimTab(tk.Frame):
     def _slot_values(self):
         return [f"{s['id']}{SEP}{s.get('time') or ''}" for s in self._slots]
 
+    def _time_values(self):
+        """臨時單堂課的可編輯時間清單：常用時段可點選，也可直接輸入新時間。"""
+        return list(dict.fromkeys(
+            s.get("time") for s in self._slots if s.get("time")))
+
     def _class_names(self):
         return {c["id"]: (c.get("name") or c["id"]) for c in self._classes}
+
+    def _set_action_emphasis(self, publish_ready):
+        """同時只保留一個綠色主操作：先加課，有變更後再引導上線。"""
+        primary = {"bg": DONE, "fg": DARK_TEXT,
+                   "activebackground": PROG, "activeforeground": DARK_TEXT}
+        secondary = {"bg": TRACK, "fg": FG,
+                     "activebackground": PANEL, "activeforeground": FG}
+        self.quick_btn.config(**(secondary if publish_ready else primary))
+        self.push_btn.config(**(primary if publish_ready else secondary))
 
     @staticmethod
     def _args(cmd, result):
@@ -686,11 +716,13 @@ class SwimTab(tk.Frame):
         return [
             {"flag": "--name", "label": "課程 / 班名", "kind": "entry",
              "required": True,
-             "hint": "同名班級只有一筆時會自動沿用；找不到就自動建立"},
+             "hint": "直接填新班名即可；系統會自動建班，不用先去班級列表"},
             {"flag": "--date", "label": "日期", "kind": "date",
              "value": date_value, "required": True, "hint": "YYYY-MM-DD"},
-            *self._slot_time_fields(),
-            {"flag": "--note", "label": "備註", "kind": "entry"},
+            {"flag": "--time", "label": "時間", "kind": "combo",
+             "values": self._time_values(), "required": True,
+             "hint": "可從清單選常用時間，或直接輸入 08:00-09:00"},
+            {"flag": "--note", "label": "備註（可不填）", "kind": "entry"},
         ]
 
     def _fields_cancel_lesson(self, class_value="", date_value="", makeup=False):
@@ -842,7 +874,10 @@ class SwimTab(tk.Frame):
     # ---- 表單 + 確認 ----
 
     def _form_then_run(self, title, cmd, fields):
-        dlg = FormDialog(self, title, fields)
+        quick_lesson = (cmd == "add-lesson" and
+                        any(f.get("flag") == "--name" for f in fields))
+        submit_text = "下一步：確認這一堂" if quick_lesson else "下一步（先看 diff）"
+        dlg = FormDialog(self, title, fields, submit_text=submit_text)
         self.wait_window(dlg)
         if dlg.result is None:
             return
@@ -934,9 +969,9 @@ class SwimTab(tk.Frame):
                        activeforeground=FG, font=F_ROW)
         menu.add_command(label=str(day), state="disabled")
         menu.add_separator()
-        menu.add_command(label="快速插入新課程",
+        menu.add_command(label="在這天臨時加一堂（新班名可直接填）",
                          command=lambda: self._form_then_run(
-                             "快速插課", "add-lesson",
+                             "臨時加一堂", "add-lesson",
                              self._fields_quick_add_lesson(date_value=str(day))))
         menu.add_separator()
         menu.add_command(label="幫既有班在這天加一堂",

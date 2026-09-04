@@ -1,14 +1,23 @@
 # HANDOFF — swim-coach-schedule
 
 > 狀態快照（每次實質推進後更新）。行為規範見 `CLAUDE.md`，結構見 `MAP.md`。
-> `updated: 2026-09-01`
+> `updated: 2026-09-04`
 
 ## 現況
 
-- schema v4；`lessons` 是唯一課次真相，`schedules` 只保留分組 metadata；現況 19 班、26 組排課、167 堂、0 筆 pending makeup
+- schema v4；`lessons` 是唯一課次真相，`schedules` 只保留分組 metadata；已提交現況 20 班、26 組排課、167 堂、0 筆 pending makeup
 - CLI 維持 19 個子命令與既有 JSON envelope；取消直接刪 lesson、挪課原地改 lesson、補課以 `makeup_lesson_id` 銷帳
 - CI（build.yml）：push main → strict validate + pytest + rebuild docs（drift 時 bot auto-commit）→ pages.yml 部署
 - 線上版：https://hangsau.github.io/swim-coach-schedule/
+
+## 本次（2026-09-04）：桌面看板臨時單堂簡化
+
+- 頭列原「快速插課」改為「＋ 臨時加一堂」；課表乾淨時它是唯一綠色主操作，寫入變更後綠色會轉到「一鍵上線」，依序引導加課 → 發布
+- 臨時單堂表單由「常用時段／自訂時段」兩欄合併成一個可編輯時間清單；常用值可點選，也可直接輸入 `08:00-09:00`
+- 班名提示、dry-run 標題與確認按鈕全改為人話，確認框明說「只新增這一堂，不建立每週固定排課」；底層仍完整保留 dry-run → apply 安全門
+- 日期空白處的入口同步改名「在這天臨時加一堂（新班名可直接填）」並預填日期
+- git dirty 指示改為只看「一鍵上線」實際會提交的 `data/` + `docs/`，避免無關程式碼／未追蹤檔讓發布按鈕永遠亮起
+- 新增 `tests/test_schedule_gui.py` 3 項，固化單一時間欄、新班名無需額外建班、常用時間去重，以及「加課 → 上線」主按鈕狀態切換
 
 ## 本次（2026-09-01）：快速插課＋僑泰代課
 

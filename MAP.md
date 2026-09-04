@@ -3,7 +3,7 @@
 > 結構地圖，給冷啟動讀者（人/LLM）。格式見 `C:\claudehome\CODEBASE_MAP_METHODOLOGY.md`。
 > 行為規範見 `CLAUDE.md`；進度/待辦見 `HANDOFF.md`。
 >
-> `last_verified: 2026-09-01`（快速插課：按名稱原子建班＋加單堂課）
+> `last_verified: 2026-09-04`（桌面看板「臨時加一堂」單表單 UX）
 
 ---
 
@@ -19,7 +19,7 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 | 你要做的事 | 動這裡 |
 |-----------|--------|
 | 增刪改班級 / 排課（程式路徑） | `scripts/schedule_cli.py`（1692 行，19 子命令；`add-lesson --name` 可原子快速建班＋加課；停課補課走 cancel-lesson --makeup → fulfill-makeup） |
-| 用滑鼠增刪改 + 一鍵 push | `scripts/schedule_gui.py`（Tkinter 月曆主視圖；頭列與日期選單都有「快速插課」；嵌桌面看板 hub） |
+| 用滑鼠增刪改 + 一鍵 push | `scripts/schedule_gui.py`（Tkinter 月曆主視圖；頭列綠色「＋ 臨時加一堂」可用新班名直接加單堂；嵌桌面看板 hub） |
 | 唯讀查課表 | `scripts/query.py`（today/week/month/day/class/slot） |
 | 改驗證規則（課次 / 衝突 / 日期 / 待補課） | `scripts/validate.py`（472 行） |
 | 改行事曆頁面長相 | `scripts/render_html.py`（940 行 → `docs/`） |
@@ -38,8 +38,8 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 | `scripts/validate.py` | 472 | schema v4、lesson 欄位／引用、時段重疊、makeups 驗證；`--strict` 供 CI | pyyaml |
 | `scripts/query.py` | 180 | 直接讀頂層 lessons，轉成 render/GUI 相容形狀；不再展開 pattern | pyyaml |
 | `scripts/render_html.py` | 940 | 產 `docs/`：月曆 / grid / summary / index | query.py |
-| `scripts/schedule_gui.py` | 1508 | Tkinter 月曆 thin client；頭列／日期選單快速插課；顯示實際 lessons、standalone lessons 與欠補帳；全部寫入走 CLI subprocess | schedule_cli.py, query.py |
-| `tests/` | 9 檔 / 113 tests | CLI（含快速插課原子性／同名解析／畸形輸入）、integration、validate、migration、render、end/update/makeup 系統測試 | pytest |
+| `scripts/schedule_gui.py` | 1543 | Tkinter 月曆 thin client；頭列／日期選單「臨時加一堂」單表單；顯示實際 lessons、standalone lessons 與欠補帳；全部寫入走 CLI subprocess | schedule_cli.py, query.py |
+| `tests/` | 10 檔 / 116 tests | CLI（含快速插課原子性／同名解析／畸形輸入）、GUI 臨時單堂表單與主操作狀態、integration、validate、migration、render、end/update/makeup 系統測試 | pytest |
 
 **產物**：`docs/`（render_html 輸出，勿手改）。
 
@@ -56,4 +56,4 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 7. **makeup 連結指向 lesson**：fulfilled 必須有 `makeup_lesson_id`；補課堂被刪時必須經 `_revert_makeups_for_removed_lessons` 回 pending。time-only lesson 的 `slot_id=None` 合法，重疊排序必須維持 None-safe。
 8. **render 必須傳同一份 data**：`render_html.expand_schedule(..., data)` 要把呼叫端 data 傳給 query；不能偷偷重讀預設檔，回歸測試在 `tests/test_render_html.py`。
 9. **v3 相容字面只留 migration**：舊 pattern／負面日期只允許存在 `migrate_v4.py` 的凍結轉換器；runtime、tests、README 不得重新引入。
-10. **快速插課不可在 GUI 串兩次寫入**：一律呼叫 `add-lesson --name`，由 CLI 在同一份 `new_data` 中解析唯一同名 class，或建立新 class 後加入 standalone lesson；validate 失敗時兩者都不能落盤。
+10. **臨時加一堂不可在 GUI 串兩次寫入**：一律呼叫 `add-lesson --name`，由 CLI 在同一份 `new_data` 中解析唯一同名 class，或建立新 class 後加入 standalone lesson；validate 失敗時兩者都不能落盤。GUI 雖只顯示一個可編輯時間欄，底層仍必須維持 dry-run → apply。
