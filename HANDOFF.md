@@ -10,6 +10,14 @@
 - CI（build.yml）：push main → strict validate + pytest + rebuild docs（drift 時 bot auto-commit）→ pages.yml 部署
 - 線上版：https://hangsau.github.io/swim-coach-schedule/
 
+## 本次（2026-09-04）：線上自訂時段完整性
+
+- 事故根因：daily grid 欄位只從 `slots` 建立、格子又以 `slot_id` 分組；`add-lesson --time 08:00-09:00` 產生的 standalone lesson 合法但 `slot_id=None`，因此資料／月曆有課，grid 卻靜默漏掉
+- grid 改以課次的 `slot_time` 為唯一欄位 key：常用 slot 欄保留，當月任何新時段自動增加「自訂」欄，並依開始時間排序
+- 月曆統計、學員總表與時段合計同步改讀實際 `slot_time`，無 slot 的課不再顯示 `?（None）`
+- 新增 `_assert_grid_complete` 上線安全門：每月 grid 納入堂數必須等於資料堂數，否則 render 直接失敗，CI 不部署
+- 新增 2 項 render 回歸測試：`08:00-09:00 僑泰國二7(代課)` 在 grid／月曆／summary 全可見；人為漏一堂時完整性門必須報錯
+
 ## 本次（2026-09-04）：桌面看板臨時單堂簡化
 
 - 頭列原「快速插課」改為「＋ 臨時加一堂」；課表乾淨時它是唯一綠色主操作，寫入變更後綠色會轉到「一鍵上線」，依序引導加課 → 發布

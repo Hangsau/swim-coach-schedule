@@ -55,6 +55,47 @@ def expand_schedule(schedules, slots_by_id, classes_by_id, data=None):
     return _expand(schedules, slots_by_id, classes_by_id, data=data)
 
 
+def _time_sort_key(time_value):
+    """時段以開始時間排序；同時適用常用 slot 與無 slot_id 的臨時課。"""
+    return str(time_value or "99:99-99:99").split("-")[0].strip()
+
+
+def _slots_grouped_by_time(slots_by_id):
+    """回傳 time -> [(slot_id, slot)]，供實際課次時間與常用 slot 對齊。"""
+    grouped = defaultdict(list)
+    for sid, slot in slots_by_id.items():
+        time_value = slot.get("time")
+        if time_value:
+            grouped[time_value].append((sid, slot))
+    return grouped
+
+
+def _time_description(time_value, slots_by_time):
+    """顯示實際時間；無常用 slot 對應時明標「自訂時段」。"""
+    matches = slots_by_time.get(time_value) or []
+    if not matches:
+        return f"{time_value}（自訂時段）"
+    ids = "/".join(sid for sid, _ in matches)
+    notes = " / ".join(dict.fromkeys(
+        slot.get("note", "") for _, slot in matches if slot.get("note")))
+    note_text = f" {notes}" if notes else ""
+    return f"{time_value}{note_text}（{ids}）"
+
+
+def _assert_grid_complete(month_lessons, grid, time_values):
+    """上線安全門：grid 漏掉任何課次就讓 render/CI 失敗，不部署殘缺頁。"""
+    rendered_count = sum(
+        len(by_time.get(time_value, []))
+        for by_time in grid.values()
+        for time_value in time_values
+    )
+    expected_count = len(month_lessons)
+    if rendered_count != expected_count:
+        raise RuntimeError(
+            f"grid 課次完整性失敗：應顯示 {expected_count} 堂，"
+            f"實際只納入 {rendered_count} 堂")
+
+
 def render_month(data, year, month):
     """渲染月曆 view。"""
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
@@ -151,25 +192,23 @@ def render_month(data, year, month):
 
     # 月統計
     from collections import Counter
-    slot_count = Counter()
+    time_count = Counter()
     class_count = Counter()
     for day_lessons in by_date.values():
         for l in day_lessons:
-            slot_count[l["slot_id"]] += 1
+            time_count[l["slot_time"]] += 1
             class_count[l["class_name"]] += 1
-    total = sum(slot_count.values())
+    total = sum(time_count.values())
 
     html.append('<aside class="month-stats">')
     html.append(f'<h2>📊 {year} 年 {month} 月統計</h2>')
     html.append(f'<div class="stat-total">總堂數：<strong>{total}</strong> 堂</div>')
     html.append('<table class="calendar"><thead><tr><th>時段</th><th>堂數</th></tr></thead><tbody>')
-    # 按 slot 起始時間排（不是字串排序，避免 S10 排在 S3 前）
-    def _slot_time_key(sid):
-        t = slots_by_id.get(sid, {}).get("time", "99:99-99:99")
-        return t.split("-")[0].strip()
-    for sid in sorted(slot_count.keys(), key=_slot_time_key):
-        slot = slots_by_id.get(sid, {})
-        html.append(f'<tr><td>{slot.get("time","?")} {slot.get("note","")}（{sid}）</td><td>{slot_count[sid]}</td></tr>')
+    slots_by_time = _slots_grouped_by_time(slots_by_id)
+    for time_value in sorted(time_count, key=_time_sort_key):
+        html.append(
+            f'<tr><td>{_time_description(time_value, slots_by_time)}</td>'
+            f'<td>{time_count[time_value]}</td></tr>')
     html.append('</tbody></table>')
     html.append('<table class="calendar"><thead><tr><th>學員</th><th>堂數</th></tr></thead><tbody>')
     for cname in sorted(class_count.keys()):
@@ -613,14 +652,15 @@ def render_summary(data):
         lessons = sorted([l for l in all_lessons if l["class_id"] == cls_id], key=lambda x: x["date"])
         if not lessons:
             continue
-        slot = slots_by_id.get(lessons[0]["slot_id"], {})
+        lesson_times = sorted(
+            set(l["slot_time"] for l in lessons), key=_time_sort_key)
         days_count = Counter(l["day"] for l in lessons)
         days_str = "、".join(f"{DAY_NAMES_ZH[d]}{c}" for d, c in sorted(days_count.items()))
 
         html.append('<div class="summary-block">')
         html.append(f'<h2>{cls["name"]} <span class="count">{len(lessons)} 堂</span></h2>')
         html.append('<div class="meta">')
-        html.append(f'<span>時段：{slot.get("time", "?")}</span>')
+        html.append(f'<span>時段：{"、".join(lesson_times)}</span>')
         html.append(f'<span>每週：{days_str}</span>')
         html.append(f'<span>開始：{lessons[0]["date"]}（{DAY_NAMES_ZH[lessons[0]["day"]]}）</span>')
         html.append(f'<span>結束：{lessons[-1]["date"]}（{DAY_NAMES_ZH[lessons[-1]["day"]]}）</span>')
@@ -636,15 +676,13 @@ def render_summary(data):
     html.append('<div class="summary-block total">')
     html.append(f'<h2>總計 {total} 堂</h2>')
 
-    slot_count = Counter(l["slot_id"] for l in all_lessons)
+    time_count = Counter(l["slot_time"] for l in all_lessons)
     html.append('<table class="calendar"><thead><tr><th>時段</th><th>堂數</th></tr></thead><tbody>')
-    def _slot_time_key(sid):
-        t = slots_by_id.get(sid, {}).get("time", "99:99-99:99")
-        return t.split("-")[0].strip()
-    for sid in sorted(slot_count.keys(), key=_slot_time_key):
-        count = slot_count[sid]
-        slot = slots_by_id.get(sid, {})
-        html.append(f'<tr><td>{slot.get("time", "?")} {slot.get("note", "")}（{sid}）</td><td>{count}</td></tr>')
+    slots_by_time = _slots_grouped_by_time(slots_by_id)
+    for time_value in sorted(time_count, key=_time_sort_key):
+        html.append(
+            f'<tr><td>{_time_description(time_value, slots_by_time)}</td>'
+            f'<td>{time_count[time_value]}</td></tr>')
     html.append('</tbody></table>')
     html.append('</div>')
 
@@ -655,8 +693,9 @@ def render_summary(data):
 
 
 def render_grid(data, year, month):
-    """渲染 daily grid view：每天一列 × 每時段一欄（8 個時段）
+    """渲染 daily grid view：每天一列 × 每個實際時間一欄。
 
+    常用 slot 與無 slot_id 的臨時／自訂時段都必須顯示；
     有課的格子顯示學員名，沒課留空。
     """
     slots_by_id = {s["id"]: s for s in data.get("slots", [])}
@@ -665,28 +704,26 @@ def render_grid(data, year, month):
 
     # 篩選該月
     month_lessons = [l for l in all_lessons if l["date"].year == year and l["date"].month == month]
-    # 時段按時間排序（解析 HH:MM-HH:MM）
-    def slot_sort_key(sid):
-        t = slots_by_id[sid].get("time", "99:99-99:99")
-        return t.split("-")[0].strip()
-    slot_ids = sorted(slots_by_id.keys(), key=slot_sort_key)
-    slot_meta = [(sid, slots_by_id[sid].get("time", "?")) for sid in slot_ids]
+    # 欄位以實際時間為 key：常用 slots 全保留，本月臨時時段動態加入。
+    slots_by_time = _slots_grouped_by_time(slots_by_id)
+    time_values = sorted(
+        set(slots_by_time) | {l["slot_time"] for l in month_lessons},
+        key=_time_sort_key)
+    time_meta = []
+    for time_value in time_values:
+        matches = slots_by_time.get(time_value) or []
+        heading = "/".join(sid for sid, _ in matches) if matches else "自訂"
+        time_meta.append((time_value, heading))
 
-    # 找這個月所有有課的日期
-    active_dates = sorted(set(l["date"] for l in month_lessons))
-
-    # 建立 lookup: date -> slot_id -> list of class names
+    # 建立 lookup: date -> 實際 time -> list of class names
     grid = {}
     for l in month_lessons:
-        grid.setdefault(l["date"], {}).setdefault(l["slot_id"], []).append(l["class_name"])
+        grid.setdefault(l["date"], {}).setdefault(l["slot_time"], []).append(l["class_name"])
 
-    # 找第一天（週一）— 補空格用
-    first_day = date(year, month, 1)
-    first_weekday = first_day.weekday()  # 0=mon
-    days_before = first_weekday
-    last_day_num = (first_day.replace(day=28) + timedelta(days=4))
-    last_day_num = (last_day_num - timedelta(days=last_day_num.day))
-    # 簡單：用 calendar 找月最後一天
+    # 不再允許「資料有課、grid 沒顯示」靜默上線。
+    _assert_grid_complete(month_lessons, grid, time_values)
+
+    # 用 calendar 找月最後一天
     import calendar as cal_mod
     _, last_day_num = cal_mod.monthrange(year, month)
 
@@ -738,8 +775,11 @@ def render_grid(data, year, month):
     # 表頭
     html.append('<thead><tr>')
     html.append('<th class="date-col">日期</th>')
-    for sid, stime in slot_meta:
-        html.append(f'<th title="{sid} {stime}">{sid}<br><span class="th-time">{stime}</span></th>')
+    for time_value, heading in time_meta:
+        description = _time_description(time_value, slots_by_time)
+        html.append(
+            f'<th title="{description}">{heading}<br>'
+            f'<span class="th-time">{time_value}</span></th>')
     html.append('</tr></thead>')
     html.append('<tbody>')
 
@@ -749,10 +789,10 @@ def render_grid(data, year, month):
         wd_zh = DAY_NAMES_ZH[DAY_NAMES[weekday]]
         html.append('<tr>')
         html.append(f'<td class="date-col">{d.strftime("%m/%d")}<br><span class="wd">{wd_zh}</span></td>')
-        for sid, _ in slot_meta:
-            if d in grid and sid in grid[d]:
+        for time_value, _ in time_meta:
+            if d in grid and time_value in grid[d]:
                 # 列出所有學員（用 / 分隔）
-                names = " / ".join(grid[d][sid])
+                names = " / ".join(grid[d][time_value])
                 html.append(f'<td class="filled" title="{names}">{names}</td>')
             else:
                 html.append('<td class="empty"></td>')
@@ -762,16 +802,16 @@ def render_grid(data, year, month):
 
     # tfoot 合計行：每個時段欄底加總堂數
     from collections import Counter
-    slot_count = Counter()
+    time_count = Counter()
     for l in month_lessons:
-        slot_count[l["slot_id"]] += 1
-    total = sum(slot_count.values())
+        time_count[l["slot_time"]] += 1
+    total = sum(time_count.values())
 
     html.append('<tfoot>')
     html.append('<tr class="totals">')
     html.append(f'<td class="date-col">合計<br><span class="wd">{total} 堂</span></td>')
-    for sid, _ in slot_meta:
-        cnt = slot_count.get(sid, 0)
+    for time_value, _ in time_meta:
+        cnt = time_count.get(time_value, 0)
         html.append(f'<td class="total-cell">{cnt if cnt else ""}</td>')
     html.append('</tr>')
     html.append('</tfoot>')

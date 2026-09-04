@@ -3,7 +3,7 @@
 > 結構地圖，給冷啟動讀者（人/LLM）。格式見 `C:\claudehome\CODEBASE_MAP_METHODOLOGY.md`。
 > 行為規範見 `CLAUDE.md`；進度/待辦見 `HANDOFF.md`。
 >
-> `last_verified: 2026-09-04`（桌面看板「臨時加一堂」單表單 UX）
+> `last_verified: 2026-09-04`（自訂時段動態 grid＋課次完整性門）
 
 ---
 
@@ -22,7 +22,7 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 | 用滑鼠增刪改 + 一鍵 push | `scripts/schedule_gui.py`（Tkinter 月曆主視圖；頭列綠色「＋ 臨時加一堂」可用新班名直接加單堂；嵌桌面看板 hub） |
 | 唯讀查課表 | `scripts/query.py`（today/week/month/day/class/slot） |
 | 改驗證規則（課次 / 衝突 / 日期 / 待補課） | `scripts/validate.py`（472 行） |
-| 改行事曆頁面長相 | `scripts/render_html.py`（940 行 → `docs/`） |
+| 改行事曆頁面長相 | `scripts/render_html.py`（981 行 → `docs/`；grid 依實際時間動態建欄，漏課會 fail render） |
 | 改 CI / Pages 部署 | `.github/workflows/build.yml`、`pages.yml` |
 | 查 CLI 錯誤碼含義 | `README.md` 錯誤碼處理表 |
 
@@ -37,9 +37,9 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 | `scripts/schedule_cli.py` | 1692 | 19 個命令的全部寫入路徑；dry-run/envelope/atomic_write；`add-lesson --name` 原子解析／建立 class 並新增 standalone lesson；makeups pending/fulfilled 銷帳與回復 | validate.py, query.py |
 | `scripts/validate.py` | 472 | schema v4、lesson 欄位／引用、時段重疊、makeups 驗證；`--strict` 供 CI | pyyaml |
 | `scripts/query.py` | 180 | 直接讀頂層 lessons，轉成 render/GUI 相容形狀；不再展開 pattern | pyyaml |
-| `scripts/render_html.py` | 940 | 產 `docs/`：月曆 / grid / summary / index | query.py |
+| `scripts/render_html.py` | 981 | 產 `docs/`：月曆 / grid / summary / index；自訂時段動態 grid 與課次數完整性門 | query.py |
 | `scripts/schedule_gui.py` | 1543 | Tkinter 月曆 thin client；頭列／日期選單「臨時加一堂」單表單；顯示實際 lessons、standalone lessons 與欠補帳；全部寫入走 CLI subprocess | schedule_cli.py, query.py |
-| `tests/` | 10 檔 / 116 tests | CLI（含快速插課原子性／同名解析／畸形輸入）、GUI 臨時單堂表單與主操作狀態、integration、validate、migration、render、end/update/makeup 系統測試 | pytest |
+| `tests/` | 10 檔 / 118 tests | CLI（含快速插課原子性／同名解析／畸形輸入）、GUI 臨時單堂、自訂時段 render 完整性、integration、validate、migration、end/update/makeup 系統測試 | pytest |
 
 **產物**：`docs/`（render_html 輸出，勿手改）。
 
@@ -57,3 +57,4 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 8. **render 必須傳同一份 data**：`render_html.expand_schedule(..., data)` 要把呼叫端 data 傳給 query；不能偷偷重讀預設檔，回歸測試在 `tests/test_render_html.py`。
 9. **v3 相容字面只留 migration**：舊 pattern／負面日期只允許存在 `migrate_v4.py` 的凍結轉換器；runtime、tests、README 不得重新引入。
 10. **臨時加一堂不可在 GUI 串兩次寫入**：一律呼叫 `add-lesson --name`，由 CLI 在同一份 `new_data` 中解析唯一同名 class，或建立新 class 後加入 standalone lesson；validate 失敗時兩者都不能落盤。GUI 雖只顯示一個可編輯時間欄，底層仍必須維持 dry-run → apply。
+11. **grid 不可以 `slot_id` 當欄位真相**：standalone lesson 可合法沒有 slot ID；必須以 lesson `slot_time` 建欄與分組，並保留 `_assert_grid_complete` 納入堂數檢查。

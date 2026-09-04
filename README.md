@@ -12,6 +12,8 @@
 - 每日 grid：<https://hangsau.github.io/swim-coach-schedule/grid-2026-07.html>
 - 學員總表：<https://hangsau.github.io/swim-coach-schedule/summary.html>
 
+每日 grid 依課次的**實際時間**動態產生欄位；臨時輸入、不在常用 slot 清單的新時段也會自動顯示為「自訂」欄。建置時會比對 grid 納入的課次數；只要漏一堂就會失敗，不會部署殘缺頁。
+
 > GitHub Pages 自動 build + deploy。每次 push main 後 30 秒內更新。
 
 ---
