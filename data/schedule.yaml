@@ -1197,12 +1197,6 @@ lessons:
   date: '2026-09-17'
   time: 13:00-14:00
   slot_id: S5
-- id: L-0172
-  class_id: STU-11
-  date: '2026-09-19'
-  time: 09:00-10:00
-  slot_id: S3
-  note: 補課（原 2026-08-08）
 - id: L-0182
   schedule_id: SCH-026
   class_id: STU-16
@@ -1337,6 +1331,12 @@ lessons:
   date: '2026-10-23'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0172
+  class_id: STU-11
+  date: '2026-10-24'
+  time: 09:00-10:00
+  slot_id: S3
+  note: 補課（原 2026-08-08）
 makeups:
 - id: MU-001
   class_id: STU-11
@@ -1352,7 +1352,7 @@ makeups:
   origin_schedule_id: SCH-014
   reason: ''
   status: fulfilled
-  makeup_date: '2026-09-19'
+  makeup_date: '2026-10-24'
   makeup_lesson_id: L-0172
 - id: MU-003
   class_id: STU-10
