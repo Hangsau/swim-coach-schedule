@@ -1154,12 +1154,6 @@ lessons:
   date: '2026-09-10'
   time: 13:00-14:00
   slot_id: S5
-- id: L-0204
-  schedule_id: SCH-030
-  class_id: STU-20
-  date: '2026-09-11'
-  time: 13:00-14:00
-  slot_id: S5
 - id: L-0160
   schedule_id: SCH-014
   class_id: STU-11
@@ -1337,6 +1331,12 @@ lessons:
   time: 09:00-10:00
   slot_id: S3
   note: 補課（原 2026-08-08）
+- id: L-0204
+  schedule_id: SCH-030
+  class_id: STU-20
+  date: '2026-10-30'
+  time: 13:00-14:00
+  slot_id: S5
 makeups:
 - id: MU-001
   class_id: STU-11
