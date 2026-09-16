@@ -1208,6 +1208,13 @@ lessons:
   date: '2026-09-24'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0160
+  schedule_id: SCH-014
+  class_id: STU-11
+  date: '2026-09-26'
+  time: 09:00-10:00
+  slot_id: S3
+  note: 兒童；週六 9:00；共10堂
 - id: L-0210
   class_id: STU-22
   date: '2026-09-29'
@@ -1330,13 +1337,6 @@ lessons:
   date: '2026-10-30'
   time: 13:00-14:00
   slot_id: S5
-- id: L-0160
-  schedule_id: SCH-014
-  class_id: STU-11
-  date: '2026-10-31'
-  time: 09:00-10:00
-  slot_id: S3
-  note: 兒童；週六 9:00；共10堂
 makeups:
 - id: MU-001
   class_id: STU-11
