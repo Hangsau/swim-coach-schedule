@@ -117,6 +117,10 @@ classes:
   name: 僑泰國二7(代課)
   weekly_count: 1
   level: 待確認
+- id: STU-23
+  name: 僑泰餐二丙-代課小玫
+  weekly_count: 1
+  level: 待確認
 schedules:
 - id: SCH-001
   class_id: STU-01
@@ -1242,6 +1246,10 @@ lessons:
   date: '2026-10-01'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0211
+  class_id: STU-23
+  date: '2026-10-02'
+  time: 10:10-11:10
 - id: L-0206
   schedule_id: SCH-030
   class_id: STU-20
