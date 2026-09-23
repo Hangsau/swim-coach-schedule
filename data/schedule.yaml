@@ -109,16 +109,24 @@ classes:
   name: 四德
   weekly_count: 1
   level: 待確認
-- id: STU-21
-  name: 僑泰(容二乙)代課
-  weekly_count: 1
-  level: 待確認
 - id: STU-22
   name: 僑泰國二7(代課)
   weekly_count: 1
   level: 待確認
-- id: STU-23
-  name: 僑泰餐二丙-代課小玫
+- id: STU-24
+  name: 益民(305 405)
+  weekly_count: 1
+  level: 待確認
+- id: STU-25
+  name: 益民(504 604)
+  weekly_count: 1
+  level: 待確認
+- id: STU-26
+  name: 益民(303 306)
+  weekly_count: 1
+  level: 待確認
+- id: STU-27
+  name: 益民(401 406)
   weekly_count: 1
   level: 待確認
 schedules:
@@ -1223,8 +1231,8 @@ lessons:
   class_id: STU-22
   date: '2026-09-29'
   time: 08:00-09:00
-- id: L-0209
-  class_id: STU-21
+- id: L-0212
+  class_id: STU-24
   date: '2026-09-29'
   time: 10:10-11:10
   slot_id: S4
@@ -1234,6 +1242,11 @@ lessons:
   date: '2026-09-29'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0215
+  class_id: STU-25
+  date: '2026-09-30'
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0195
   schedule_id: SCH-028
   class_id: STU-18
@@ -1246,10 +1259,11 @@ lessons:
   date: '2026-10-01'
   time: 13:00-14:00
   slot_id: S5
-- id: L-0211
-  class_id: STU-23
+- id: L-0220
+  class_id: STU-26
   date: '2026-10-02'
   time: 10:10-11:10
+  slot_id: S4
 - id: L-0206
   schedule_id: SCH-030
   class_id: STU-20
@@ -1262,12 +1276,22 @@ lessons:
   time: 09:00-10:00
   slot_id: S3
   note: 補課（原 2026-07-25）
+- id: L-0221
+  class_id: STU-27
+  date: '2026-10-05'
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0183
   schedule_id: SCH-026
   class_id: STU-16
   date: '2026-10-05'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0213
+  class_id: STU-24
+  date: '2026-10-06'
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0190
   schedule_id: SCH-027
   class_id: STU-17
@@ -1286,18 +1310,33 @@ lessons:
   date: '2026-10-08'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0222
+  class_id: STU-27
+  date: '2026-10-12'
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0184
   schedule_id: SCH-026
   class_id: STU-16
   date: '2026-10-12'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0214
+  class_id: STU-24
+  date: '2026-10-13'
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0191
   schedule_id: SCH-027
   class_id: STU-17
   date: '2026-10-13'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0216
+  class_id: STU-25
+  date: '2026-10-14'
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0197
   schedule_id: SCH-028
   class_id: STU-18
@@ -1310,6 +1349,11 @@ lessons:
   date: '2026-10-15'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0218
+  class_id: STU-26
+  date: '2026-10-16'
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0207
   schedule_id: SCH-030
   class_id: STU-20
@@ -1321,12 +1365,27 @@ lessons:
   date: '2026-10-17'
   time: 09:00-10:00
   slot_id: S3
+- id: L-0223
+  class_id: STU-27
+  date: '2026-10-19'
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0185
   schedule_id: SCH-026
   class_id: STU-16
   date: '2026-10-19'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0217
+  class_id: STU-25
+  date: '2026-10-21'
+  time: 10:10-11:10
+  slot_id: S4
+- id: L-0219
+  class_id: STU-26
+  date: '2026-10-23'
+  time: 10:10-11:10
+  slot_id: S4
 - id: L-0208
   schedule_id: SCH-030
   class_id: STU-20
