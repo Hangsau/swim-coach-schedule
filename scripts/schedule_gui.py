@@ -1008,33 +1008,65 @@ class SwimTab(tk.Frame):
         popup.wait_visibility()
         popup.grab_set()
 
+    def _split_classes(self, today_d):
+        """班級分兩組：進行中（還有未來課或欠補）依下一堂日期排；已結束依最後一堂由近到遠排。
+        回傳 ([(class, 未來堂數, 欠補數, 下一堂)], [(class, 最後一堂)])。"""
+        active, ended = [], []
+        for c in self._classes:
+            dates = sorted(l["date"] for l in self._all_lessons if l["class_id"] == c["id"])
+            future = [d for d in dates if d >= today_d]
+            pend = len(self._pending_makeups(c["id"]))
+            if future or pend:
+                active.append((c, len(future), pend, future[0] if future else None))
+            else:
+                ended.append((c, dates[-1] if dates else None))
+        active.sort(key=lambda t: (t[3] is None, t[3] or today_d, t[0]["id"]))
+        ended.sort(key=lambda t: (t[1] is None, -(t[1].toordinal() if t[1] else 0), t[0]["id"]))
+        return active, ended
+
     def _class_panel(self):
-        """班級總覽：列出所有班級與未來堂數，點一列開操作選單。"""
+        """班級總覽：進行中的班在上（依下一堂日期），已結束的班收在下方折疊區；點一列開班級詳情。"""
         panel = tk.Toplevel(self)
         panel.title("班級列表")
         panel.configure(bg=BG, padx=12, pady=10)
         panel.transient(self.winfo_toplevel())
-        tk.Label(panel, text=f"班級（{len(self._classes)}）　點一班開操作選單",
-                 bg=BG, fg=HEAD, font=F_SEC, anchor="w").pack(
-            fill="x", pady=(0, 6))
-        today_d = date.today()
-        for c in sorted(self._classes, key=lambda c: c["id"]):
-            cid = c["id"]
-            name = c.get("name") or ""
-            wc = c.get("weekly_count")
-            wc_str = str(wc) if wc else "?"
-            m = sum(1 for l in self._all_lessons
-                    if l["class_id"] == cid and l["date"] >= today_d)
-            pend = len(self._pending_makeups(cid))
-            pend_txt = f"　⚠ 欠補 {pend} 堂" if pend else ""
-            text = f"{cid}　{name}　每週 {wc_str} 堂　未來 {m} 堂{pend_txt}"
-            row = tk.Label(panel, text=text, anchor="w", bg=PANEL,
-                           fg=(BAD if pend else FG),
+        active, ended = self._split_classes(date.today())
+        tk.Label(panel, text=f"進行中（{len(active)}）　點一班開詳情",
+                 bg=BG, fg=HEAD, font=F_SEC, anchor="w").pack(fill="x", pady=(0, 6))
+
+        def add_row(parent, c, text, fg):
+            row = tk.Label(parent, text=text, anchor="w", bg=PANEL, fg=fg,
                            font=F_ROW, padx=8, pady=3)
             row.pack(fill="x", pady=1)
-            row.bind("<Button-1>",
-                     lambda ev, cc=c, p=panel: (
-                         p.destroy(), self._class_detail(cc)))
+            row.bind("<Button-1>", lambda ev, cc=c, p=panel: (p.destroy(), self._class_detail(cc)))
+
+        if not active:
+            tk.Label(panel, text="目前沒有進行中的班", bg=BG, fg=MUTED,
+                     font=F_ROW, anchor="w").pack(fill="x")
+        for c, m, pend, nxt in active:
+            wc = c.get("weekly_count")
+            pend_txt = f"　⚠ 欠補 {pend} 堂" if pend else ""
+            nxt_txt = f"　下一堂 {nxt.month}/{nxt.day}" if nxt else ""
+            add_row(panel, c, f"{c['id']}　{c.get('name') or ''}　每週 {wc or '?'} 堂"
+                              f"　未來 {m} 堂{nxt_txt}{pend_txt}", BAD if pend else FG)
+
+        if ended:
+            box = tk.Frame(panel, bg=BG)
+            toggle = tk.Label(panel, bg=BG, fg=MUTED, font=F_SEC, anchor="w", cursor="hand2")
+            toggle.pack(fill="x", pady=(10, 4))
+            for c, last in ended:
+                last_txt = f"　最後一堂 {last.month}/{last.day}" if last else "　沒有課次"
+                add_row(box, c, f"{c['id']}　{c.get('name') or ''}{last_txt}", MUTED)
+
+            def flip(ev=None):
+                if box.winfo_ismapped():
+                    box.pack_forget()
+                    toggle.config(text=f"▸ 已結束（{len(ended)}）　點開查看")
+                else:
+                    box.pack(fill="x", after=toggle)
+                    toggle.config(text=f"▾ 已結束（{len(ended)}）")
+            toggle.bind("<Button-1>", flip)
+            toggle.config(text=f"▸ 已結束（{len(ended)}）　點開查看")
         make_btn(panel, "關閉", panel.destroy, color=PANEL).pack(
             side="right", pady=(8, 0))
         panel.wait_visibility()

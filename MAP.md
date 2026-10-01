@@ -3,7 +3,7 @@
 > 結構地圖，給冷啟動讀者（人/LLM）。格式見 `C:\claudehome\CODEBASE_MAP_METHODOLOGY.md`。
 > 行為規範見 `CLAUDE.md`；進度/待辦見 `HANDOFF.md`。
 >
-> `last_verified: 2026-09-04`（自訂時段動態 grid＋課次完整性門）
+> `last_verified: 2026-10-01`（班級列表進行中／已結束分組）
 
 ---
 
@@ -19,7 +19,7 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 | 你要做的事 | 動這裡 |
 |-----------|--------|
 | 增刪改班級 / 排課（程式路徑） | `scripts/schedule_cli.py`（1692 行，19 子命令；`add-lesson --name` 可原子快速建班＋加課；停課補課走 cancel-lesson --makeup → fulfill-makeup） |
-| 用滑鼠增刪改 + 一鍵 push | `scripts/schedule_gui.py`（Tkinter 月曆主視圖；頭列綠色「＋ 臨時加一堂」可用新班名直接加單堂；嵌桌面看板 hub） |
+| 用滑鼠增刪改 + 一鍵 push | `scripts/schedule_gui.py`（Tkinter 月曆主視圖；頭列綠色「＋ 臨時加一堂」可用新班名直接加單堂；「班級 ▾」進行中在上、已結束折疊（`_split_classes`）；嵌桌面看板 hub） |
 | 唯讀查課表 | `scripts/query.py`（today/week/month/day/class/slot） |
 | 改驗證規則（課次 / 衝突 / 日期 / 待補課） | `scripts/validate.py`（472 行） |
 | 改行事曆頁面長相 | `scripts/render_html.py`（981 行 → `docs/`；grid 依實際時間動態建欄，漏課會 fail render） |
@@ -39,7 +39,7 @@ Python 3.10+ / PyYAML / Tkinter（GUI）。無其他依賴。
 | `scripts/query.py` | 180 | 直接讀頂層 lessons，轉成 render/GUI 相容形狀；不再展開 pattern | pyyaml |
 | `scripts/render_html.py` | 981 | 產 `docs/`：月曆 / grid / summary / index；自訂時段動態 grid 與課次數完整性門 | query.py |
 | `scripts/schedule_gui.py` | 1543 | Tkinter 月曆 thin client；頭列／日期選單「臨時加一堂」單表單；顯示實際 lessons、standalone lessons 與欠補帳；全部寫入走 CLI subprocess | schedule_cli.py, query.py |
-| `tests/` | 10 檔 / 118 tests | CLI（含快速插課原子性／同名解析／畸形輸入）、GUI 臨時單堂、自訂時段 render 完整性、integration、validate、migration、end/update/makeup 系統測試 | pytest |
+| `tests/` | 10 檔 / 119 tests | CLI（含快速插課原子性／同名解析／畸形輸入）、GUI 臨時單堂、自訂時段 render 完整性、integration、validate、migration、end/update/makeup 系統測試 | pytest |
 
 **產物**：`docs/`（render_html 輸出，勿手改）。
 

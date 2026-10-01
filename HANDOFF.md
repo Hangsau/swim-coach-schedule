@@ -1,14 +1,19 @@
 # HANDOFF — swim-coach-schedule
 
 > 狀態快照（每次實質推進後更新）。行為規範見 `CLAUDE.md`，結構見 `MAP.md`。
-> `updated: 2026-09-04`
+> `updated: 2026-10-01`
 
 ## 現況
 
-- schema v4；`lessons` 是唯一課次真相，`schedules` 只保留分組 metadata；已提交現況 20 班、26 組排課、167 堂、0 筆 pending makeup
+- schema v4；`lessons` 是唯一課次真相，`schedules` 只保留分組 metadata；已提交現況 23 班（進行中 10、已結束 13）、26 組排課、178 堂、0 筆 pending makeup
 - CLI 維持 19 個子命令與既有 JSON envelope；取消直接刪 lesson、挪課原地改 lesson、補課以 `makeup_lesson_id` 銷帳
 - CI（build.yml）：push main → strict validate + pytest + rebuild docs（drift 時 bot auto-commit）→ pages.yml 部署
 - 線上版：https://hangsau.github.io/swim-coach-schedule/
+
+## 本次（2026-10-01）：班級列表分「進行中／已結束」
+
+- 原列表 23 班依編號混排，其中 13 班已上完；改為進行中（有未來課或欠補）在上、依下一堂日期排並顯示「下一堂 M/D」，已結束收進下方預設折疊的「▸ 已結束（N）」，點開依最後一堂由近到遠列出、灰字
+- 抽出 `SwimTab._split_classes(today)` 純邏輯；新增 1 項 GUI 測試（共 119 tests）；真實資料開窗截圖確認折疊／展開
 
 ## 本次（2026-09-04）：線上自訂時段完整性
 
@@ -119,5 +124,7 @@
 - 已過 /code-audit
 
 ## 已知事項 / 待辦
+
+- **待做：課選單加「這堂順延到最後」**（2026-10-01 使用者確認要做、先記著）。依據：GUI 存檔紀錄最常見動作是把一堂課挪到該排課最後一堂之後（9/12→10/31、9/11→10/30、9/19→10/24、10/16→10/30），且多次挪錯再挪回（8/21↔9/16、8/19↔8/13）。設計：自動算該 schedule 最後一堂之後的下一個同星期同時段，底層走既有 `move-lesson`（dry-run → apply），確認框直接寫「9/12 → 10/31」；撞課照 E_TIME_OVERLAP 人話化
 
 - level 欄位多為「待確認」——資料債，非程式問題（GUI 已隱藏此欄，僅 YAML / CLI 可見）

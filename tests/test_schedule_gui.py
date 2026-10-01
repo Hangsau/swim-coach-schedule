@@ -57,3 +57,22 @@ def test_primary_action_moves_from_quick_add_to_publish_after_change():
     tab._set_action_emphasis(publish_ready=True)
     assert tab.quick_btn.options["bg"] == schedule_gui.TRACK
     assert tab.push_btn.options["bg"] == schedule_gui.DONE
+
+
+def test_class_list_puts_active_first_and_folds_ended():
+    from datetime import date
+    tab = schedule_gui.SwimTab.__new__(schedule_gui.SwimTab)
+    tab._classes = [{"id": "STU-01"}, {"id": "STU-02"}, {"id": "STU-03"}, {"id": "STU-04"}, {"id": "STU-05"}]
+    tab._all_lessons = [
+        {"class_id": "STU-01", "date": date(2026, 9, 1)},   # 已結束，較早
+        {"class_id": "STU-02", "date": date(2026, 10, 20)},  # 進行中，下一堂較晚
+        {"class_id": "STU-03", "date": date(2026, 9, 20)},   # 已結束，較近
+        {"class_id": "STU-04", "date": date(2026, 9, 30)},
+        {"class_id": "STU-04", "date": date(2026, 10, 3)},   # 進行中，下一堂較早
+    ]
+    tab._makeups = [{"class_id": "STU-05", "status": "pending"}]  # 沒有課但欠補，仍算進行中
+    active, ended = tab._split_classes(date(2026, 10, 1))
+    assert [c["id"] for c, *_ in active] == ["STU-04", "STU-02", "STU-05"]
+    assert active[0][1:] == (1, 0, date(2026, 10, 3))
+    assert active[2][1:] == (0, 1, None)
+    assert [(c["id"], last) for c, last in ended] == [("STU-03", date(2026, 9, 20)), ("STU-01", date(2026, 9, 1))]
