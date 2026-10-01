@@ -76,3 +76,30 @@ def test_class_list_puts_active_first_and_folds_ended():
     assert active[0][1:] == (1, 0, date(2026, 10, 3))
     assert active[2][1:] == (0, 1, None)
     assert [(c["id"], last) for c, last in ended] == [("STU-03", date(2026, 9, 20)), ("STU-01", date(2026, 9, 1))]
+
+
+def _lessons(sid, *days):
+    from datetime import date
+    return [{"schedule_id": sid, "class_id": "STU-01", "date": date.fromisoformat(d)} for d in days]
+
+
+def test_postpone_goes_to_next_weekly_slot_after_last_lesson():
+    from datetime import date
+    ls = _lessons("SCH-1", "2026-09-12", "2026-09-19", "2026-09-26", "2026-10-24")  # 週六
+    assert schedule_gui.postpone_target(ls, ls[0]) == date(2026, 10, 31)
+    assert schedule_gui.postpone_target(ls, ls[-1]) == date(2026, 10, 31)  # 最後一堂也往後推一週
+
+
+def test_postpone_follows_two_day_pattern_and_ignores_one_off_moves():
+    from datetime import date
+    # 一三班，最後一堂 10/28（三）；10/30（五）是挪過的單堂，不算固定星期
+    ls = _lessons("SCH-2", "2026-10-19", "2026-10-21", "2026-10-26", "2026-10-28", "2026-10-30")
+    assert schedule_gui.postpone_target(ls, ls[0]) == date(2026, 11, 2)
+
+
+def test_postpone_counts_whole_class_including_standalone_lessons():
+    from datetime import date
+    # 真實情境（STU-11）：主排課 9/26 結束，之後都是補課獨立課次；別班的課不能算進來
+    ls = _lessons("SCH-014", "2026-09-05", "2026-09-26") + _lessons(None, "2026-10-03", "2026-10-24")
+    other = [{"schedule_id": None, "class_id": "STU-99", "date": date(2026, 12, 5)}]
+    assert schedule_gui.postpone_target(ls + other, ls[2]) == date(2026, 10, 31)

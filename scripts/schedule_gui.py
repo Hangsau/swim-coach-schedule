@@ -21,7 +21,8 @@ import subprocess
 import sys
 import threading
 import tkinter as tk
-from datetime import date, datetime
+from collections import Counter
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from tkinter import ttk
 
@@ -404,6 +405,21 @@ class ConfirmDialog(tk.Toplevel):
                      color=DONE, fg=DARK_TEXT).pack(side="right", padx=4)
         self.wait_visibility()
         self.grab_set()
+
+
+def postpone_target(lessons, lesson):
+    """「順延到最後」的目標日：這班最後一堂之後，下一個這班固定上課的星期。
+
+    以班為單位（含補課等獨立課次，排課 v4 也不存星期）：班上出現 ≥2 次的星期才算固定上課日
+    （排除挪過的單堂），都不夠就用這堂自己的星期。時段沿用這堂原本的，不在這裡決定。
+    """
+    dates = [l["date"] for l in lessons if l.get("class_id") == lesson.get("class_id")]
+    counts = Counter(d.weekday() for d in dates)
+    weekdays = {wd for wd, n in counts.items() if n >= 2} or {lesson["date"].weekday()}
+    day = max(dates + [lesson["date"]]) + timedelta(days=1)
+    while day.weekday() not in weekdays:
+        day += timedelta(days=1)
+    return day
 
 
 class SwimTab(tk.Frame):
@@ -896,6 +912,20 @@ class SwimTab(tk.Frame):
         ConfirmDialog(self, title + "（已寫入）" if resp.get("ok") else title, resp)
         self.refresh()
 
+    def _add_postpone_item(self, menu, lesson, wrap=lambda fn: fn):
+        """選單加「順延到最後（→ M/D）」：日期由程式算好，直接進 dry-run 確認框，不再填表。"""
+        target = postpone_target(self._all_lessons, lesson)
+        menu.add_command(label=f"順延到最後（→ {target.month}/{target.day}）",
+                         command=wrap(lambda: self._postpone(lesson, target)))
+
+    def _postpone(self, lesson, target):
+        src = lesson["date"]
+        title = f"順延到最後：{src.month}/{src.day} → {target.month}/{target.day}"
+        args = ["move-lesson", "--class", lesson["class_id"],
+                "--from-date", str(src), "--to-date", str(target)]
+        resp = humanize(run_cli(args), self._class_names())
+        ConfirmDialog(self, title, resp, on_confirm=lambda: self._apply(title, args))
+
     # ---- 選單 ----
 
     def _lesson_menu(self, ev, lesson):
@@ -924,6 +954,7 @@ class SwimTab(tk.Frame):
                              self._fields_move_lesson(
                                  class_value=cls_val,
                                  from_value=str(lesson["date"]))))
+        self._add_postpone_item(menu, lesson)
         if lesson.get("schedule_id"):
             menu.add_command(label="這班從某天起換時段…",
                              command=lambda: self._form_then_run(
@@ -1176,6 +1207,10 @@ class SwimTab(tk.Frame):
             command=_close_then(lambda: self._form_then_run(
                 "挪課", "move-lesson",
                 self._fields_move_lesson(class_value=cls_val, from_value=dstr))))
+        lesson = next((l for l in self._all_lessons
+                       if l["class_id"] == c["id"] and l["date"] == lesson_date), None)
+        if lesson:
+            self._add_postpone_item(menu, lesson, wrap=_close_then)
         menu.add_command(
             label="只改這堂時間",
             command=_close_then(lambda: self._form_then_run(
