@@ -33,16 +33,17 @@ PAGES_URL = "https://hangsau.github.io/swim-coach-schedule/"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from query import DAY_NAMES, expand_schedule, load as load_data  # noqa: E402
 
-# ---- 配色：沿用桌面看板 NOC 風（與 religions-history 刊版一致；蓄意複製、不跨 repo import）----
-BG    = "#15181c"
-PANEL = "#1e2228"
-FG    = "#d7dae0"
-MUTED = "#7c828c"
-DONE  = "#5b8a52"
-PROG  = "#d9a441"
-BAD   = "#c0504d"
-TRACK = "#2b3038"
-HEAD  = "#c8956c"
+# ---- 配色：桌面看板艦橋 HUD（色票來源 C:\claudehome\tools\deskboard\hud.py；蓄意複製、不跨 repo import）----
+BG    = "#0b1020"
+PANEL = "#121a2e"
+FG    = "#e6f1ff"
+MUTED = "#8ea3c7"
+DONE  = "#5cf2a2"
+PROG  = "#ffc857"
+BAD   = "#ff4fa3"
+TRACK = "#18233d"
+HEAD  = "#3ee6ff"
+F_CODE = ("Bahnschrift SemiBold", 10)  # 站點代號（HUD 標籤字）
 
 FONT    = "Microsoft JhengHei"
 F_TITLE = (FONT, 17, "bold")
@@ -61,12 +62,12 @@ ERR_TAIL_LONG = 800  # envelope 錯誤訊息截尾長度
 CHIPS_PER_ROW = 8  # 班級詳情每列鋪幾個日期 chip（避免視窗過寬）
 
 MAX_CHIPS = 3        # 每日格最多直接顯示的課數，超過收進「+N」
-CHIP_FG = "#e8eaee"      # 班級 chip 上的亮字
-DARK_TEXT = "#12151a"    # 強調色（綠）按鈕上的深色字
+CHIP_FG = "#e6f1ff"      # 班級 chip 上的亮字（對下列 chip 底色皆 ≥5.4:1）
+DARK_TEXT = "#0b1020"    # 強調色（綠）按鈕上的深色字（13.2:1）
 WEEKDAY_ZH = ["一", "二", "三", "四", "五", "六", "日"]
-# 班級色票（NOC 同調的暗色系；以 class_id 字元和取模指派，跨 session 穩定）
-CHIP_COLORS = ["#3d5a80", "#5b8a52", "#8a6d3b", "#7a4b6b",
-               "#4b7a78", "#8a524d", "#586b8a", "#6b8a52"]
+# 班級色票（HUD 同調的深寶石色；以 class_id 字元和取模指派，跨 session 穩定）
+CHIP_COLORS = ["#1f5f8b", "#1e6b52", "#7a5a1e", "#6b2f6b",
+               "#1f6b6b", "#7a2f45", "#3a4f9a", "#4a6b1f"]
 
 
 def chip_color(class_id):
@@ -438,7 +439,10 @@ class SwimTab(tk.Frame):
         # 頭列
         head = tk.Frame(self, bg=BG)
         head.pack(fill="x", padx=18, pady=(14, 0))
-        tk.Label(head, text="游泳課表", bg=BG, fg=HEAD, font=F_TITLE).pack(side="left")
+        title = tk.Frame(head, bg=BG)
+        title.pack(side="left")
+        tk.Label(title, text="LOG ・ 任務日誌", bg=BG, fg=HEAD, font=F_CODE).pack(anchor="w")
+        tk.Label(title, text="游泳課表", bg=BG, fg=FG, font=F_TITLE).pack(anchor="w")
 
         nav = tk.Frame(head, bg=BG)
         nav.pack(side="right")
@@ -535,7 +539,8 @@ class SwimTab(tk.Frame):
                     status, classes, slots, lessons, g_dirty, ahead,
                     raw_schedules, raw_makeups))
             except Exception as ex:
-                self.after(0, lambda: self.sum_lbl.config(
+                # ex 在 except 結束後會被刪除，延後執行的 lambda 必須用預設參數綁住
+                self.after(0, lambda ex=ex: self.sum_lbl.config(
                     text=f"✘ 載入失敗：{ex}", fg=BAD))
             finally:
                 self._loading = False
