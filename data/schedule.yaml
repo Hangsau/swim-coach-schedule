@@ -129,6 +129,14 @@ classes:
   name: 益民(401 406)
   weekly_count: 1
   level: 待確認
+- id: STU-28
+  name: 正光國小(代冠丞)
+  weekly_count: 1
+  level: 待確認
+- id: STU-29
+  name: 大里國小(代冠丞)
+  weekly_count: 1
+  level: 待確認
 schedules:
 - id: SCH-001
   class_id: STU-01
@@ -1310,6 +1318,10 @@ lessons:
   date: '2026-10-08'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0224
+  class_id: STU-28
+  date: '2026-10-12'
+  time: 08:00-09:00
 - id: L-0222
   class_id: STU-27
   date: '2026-10-12'
@@ -1321,6 +1333,10 @@ lessons:
   date: '2026-10-12'
   time: 13:00-14:00
   slot_id: S5
+- id: L-0225
+  class_id: STU-29
+  date: '2026-10-13'
+  time: 08:00-09:00
 - id: L-0214
   class_id: STU-24
   date: '2026-10-13'

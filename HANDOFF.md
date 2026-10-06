@@ -1,14 +1,20 @@
 # HANDOFF — swim-coach-schedule
 
 > 狀態快照（每次實質推進後更新）。行為規範見 `CLAUDE.md`，結構見 `MAP.md`。
-> `updated: 2026-10-01`
+> `updated: 2026-10-06`
 
 ## 現況
 
-- schema v4；`lessons` 是唯一課次真相，`schedules` 只保留分組 metadata；已提交現況 23 班（進行中 10、已結束 13）、26 組排課、178 堂、0 筆 pending makeup
+- schema v4；`lessons` 是唯一課次真相，`schedules` 只保留分組 metadata；現況 25 班、26 組排課、180 堂、0 筆 pending makeup
 - CLI 維持 19 個子命令與既有 JSON envelope；取消直接刪 lesson、挪課原地改 lesson、補課以 `makeup_lesson_id` 銷帳
 - CI（build.yml）：push main → strict validate + pytest + rebuild docs（drift 時 bot auto-commit）→ pages.yml 部署
 - 線上版：https://hangsau.github.io/swim-coach-schedule/
+
+## 本次（2026-10-06）：新增兩堂代冠丞課程
+
+- 2026-10-12 08:00–09:00：正光國小(代冠丞)，STU-28／L-0224
+- 2026-10-13 08:00–09:00：大里國小(代冠丞)，STU-29／L-0225
+- 經 CLI dry-run → apply 新增單堂，使用自訂時段 `08:00-09:00`；strict validate 與網頁重建通過，月曆／每日 grid 均納入新課。
 
 ## 本次（2026-10-01）：「順延到最後」一鍵挪課
 
